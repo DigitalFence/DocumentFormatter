@@ -83,8 +83,8 @@ for file in "$@"; do
     ext_lower=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
     echo "File extension: $ext_lower"
     
-    # Use AI-enhanced converter for text files, simple converter for others
-    if [[ "$ext_lower" == "txt" ]]; then
+    # Use AI-enhanced converter for text and RTF files, simple converter for others
+    if [[ "$ext_lower" == "txt" ]] || [[ "$ext_lower" == "rtf" ]]; then
         echo "Text file detected, checking for Claude CLI..."
         
         # Check if Claude is available in common locations

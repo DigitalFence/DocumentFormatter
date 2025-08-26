@@ -4,7 +4,7 @@ An intelligent document formatter that converts text, markdown, and Word documen
 
 ## Features
 
-- **Multiple Input Formats**: Supports `.txt`, `.md`, `.markdown`, `.docx`, and `.doc` files
+- **Multiple Input Formats**: Supports `.txt`, `.rtf`, `.md`, `.markdown`, `.docx`, and `.doc` files
 - **Smart Style Matching**: Automatically extracts and applies formatting from a reference Word document
 - **AI-Enhanced Text Processing**: Uses Claude AI to intelligently structure plain text files
 - **Finder Integration**: Right-click any document in macOS Finder to format instantly

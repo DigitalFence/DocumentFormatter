@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 from typing import Optional, Tuple
 from document_converter import DocumentConverter
+from striprtf.striprtf import rtf_to_text
 
 class AIDocumentConverter:
     """Converts documents with AI-powered text analysis."""
@@ -163,9 +164,22 @@ Text to convert:
             if self.show_progress:
                 print(f"📄 Processing: {input_path.name}")
             
-            # Read the input file
-            with open(input_path, 'r', encoding='utf-8') as f:
-                text_content = f.read()
+            # Read the input file based on format
+            if input_path.suffix.lower() == '.rtf':
+                # Read RTF file and extract plain text
+                try:
+                    with open(input_path, 'r', encoding='utf-8') as f:
+                        rtf_content = f.read()
+                    text_content = rtf_to_text(rtf_content)
+                    if self.debug:
+                        print(f"Extracted text from RTF: {len(text_content)} characters")
+                except Exception as e:
+                    print(f"❌ Error reading RTF file: {e}")
+                    return False
+            else:
+                # Read regular text files
+                with open(input_path, 'r', encoding='utf-8') as f:
+                    text_content = f.read()
             
             if not text_content.strip():
                 print(f"❌ Error: Input file is empty: {input_path}")
@@ -175,7 +189,7 @@ Text to convert:
             use_ai = True
             markdown_content = ""
             
-            if input_path.suffix.lower() == '.txt':
+            if input_path.suffix.lower() in ['.txt', '.rtf']:
                 # Try AI analysis for text files
                 if self.show_progress:
                     print(f"🔍 Analyzing document structure...")

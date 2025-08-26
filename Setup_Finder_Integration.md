@@ -26,7 +26,7 @@ do
     ext="${file##*.}"
     ext_lower=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
     
-    if [[ "$ext_lower" == "txt" ]] || [[ "$ext_lower" == "md" ]] || [[ "$ext_lower" == "markdown" ]] || [[ "$ext_lower" == "docx" ]] || [[ "$ext_lower" == "doc" ]]; then
+    if [[ "$ext_lower" == "txt" ]] || [[ "$ext_lower" == "rtf" ]] || [[ "$ext_lower" == "md" ]] || [[ "$ext_lower" == "markdown" ]] || [[ "$ext_lower" == "docx" ]] || [[ "$ext_lower" == "doc" ]]; then
         /Users/KDP/scripts/wordformatterbyclaude/format_document.sh "$file"
     else
         osascript -e "display dialog \"File format not supported: $ext\" buttons {\"OK\"} default button \"OK\""
@@ -55,6 +55,7 @@ Before using the service, place your reference Word document in one of these loc
 
 ## Supported File Types
 - Text files (.txt)
+- Rich Text Format (.rtf)
 - Markdown files (.md, .markdown)
 - Word documents (.docx, .doc)
 
