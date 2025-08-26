@@ -1,0 +1,80 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Word documents (generated output)
+*_formatted.docx
+*_formatted.doc
+
+# Markdown (generated intermediate files)
+*_markdown.md
+*_debug.md
+*_ai_gen.md
+
+# Logs
+*.log
+/tmp/word_formatter.log
+word_formatter.log
+
+# Test outputs
+test_samples/*_formatted.docx
+test_samples/*_markdown.md
+test_samples/*_debug.md
+test_samples/*_ai_gen.md
+test_samples/test_*.docx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+.temporary/
+
+# Backup files
+*.backup
+*.bak
+wordformatterbyclaudeBackup.zip
