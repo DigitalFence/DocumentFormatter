@@ -73,6 +73,12 @@ test_samples/test_*.docx
 # Temporary files
 *.tmp
 .temporary/
+~$*.docx
+~$*.doc
+~$*.xlsx
+~$*.xls
+~$*.pptx
+~$*.ppt
 
 # Backup files
 *.backup
