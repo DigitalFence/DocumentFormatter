@@ -1,0 +1,19 @@
+# Testing dependencies for Word Formatter system
+
+# Core testing framework
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-timeout>=2.1.0
+
+# Performance and system monitoring
+psutil>=5.8.0
+
+# Document processing (same as main requirements)
+python-docx>=0.8.11
+markdown>=3.3.0
+beautifulsoup4>=4.9.0
+striprtf>=0.0.20
+
+# Additional testing utilities
+mock>=4.0.0
+coverage>=6.0.0

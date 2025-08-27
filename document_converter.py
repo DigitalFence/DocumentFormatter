@@ -426,7 +426,7 @@ class DocumentConverter:
         soup = BeautifulSoup(html, 'html.parser')
         
         # Process each element
-        for element in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'table', 'pre']):
+        for element in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'blockquote', 'ul', 'ol', 'table', 'pre']):
             self._process_html_element(element)
     
     def _process_html_element(self, element):
@@ -448,6 +448,41 @@ class DocumentConverter:
                 heading.paragraph_format.space_before = Pt(24)
                 heading.paragraph_format.space_after = Pt(18)
                 heading.paragraph_format.keep_with_next = True
+        
+        elif element.name == 'blockquote':
+            # Handle blockquotes (Sanskrit quotes, etc.)
+            para = self.output_doc.add_paragraph()
+            # Center align blockquotes
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            para.paragraph_format.space_before = Pt(12)
+            para.paragraph_format.space_after = Pt(12)
+            
+            # Process blockquote content
+            for child in element.children:
+                if hasattr(child, 'name'):
+                    if child.name == 'p':
+                        # Process paragraph within blockquote
+                        text = child.get_text().strip()
+                        if text:
+                            if text.startswith('—'):
+                                # Source citation - make it italic and smaller
+                                run = para.add_run(text)
+                                run.italic = True
+                                if run.font.size:
+                                    run.font.size = Pt(10)
+                            else:
+                                # Check for italics in the original
+                                if child.find('em') or child.find('i'):
+                                    run = para.add_run(child.get_text().strip())
+                                    run.italic = True
+                                else:
+                                    para.add_run(child.get_text().strip())
+                            para.add_run('\n')
+                else:
+                    # Plain text in blockquote
+                    if str(child).strip():
+                        para.add_run(str(child).strip())
+                        para.add_run('\n')
             
         elif element.name == 'p':
             para = self.output_doc.add_paragraph()

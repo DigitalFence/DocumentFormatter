@@ -47,6 +47,17 @@ Instructions:
    - Arabic, Hebrew, Chinese, Japanese, or any other non-Latin scripts
    - Romanized/transliterated words from other languages
    - Example: *Vāg vai brahma | vācā hy evedaṃ sarvaṃ sṛṣṭam*
+10. SPECIAL FORMATTING for chapter opening quotes:
+   - Detect Sanskrit/spiritual quotes at the beginning of chapters
+   - Format as centered blockquotes with this pattern:
+     > *Sanskrit transliteration in italics*
+     > 
+     > English translation
+     > 
+     > — Source citation
+   - Use > for blockquote and ensure proper spacing
+   - The transliteration should be italicized
+   - The source should start with em dash (—)
 
 CRITICAL REQUIREMENTS:
 - Process the ENTIRE document in one response
