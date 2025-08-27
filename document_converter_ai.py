@@ -41,6 +41,12 @@ Instructions:
 6. Use heading levels (# ## ###) based on document hierarchy
 7. Format code blocks if you detect code snippets
 8. Identify tables and convert to markdown table format
+9. ITALICIZE non-English text and transliterated text with *text* formatting:
+   - Sanskrit transliterations (text with diacritical marks like ā, ī, ū, ṛ, ṣ, ṇ, ṃ, ḥ, etc.)
+   - Devanagari script (हिन्दी, संस्कृत)
+   - Arabic, Hebrew, Chinese, Japanese, or any other non-Latin scripts
+   - Romanized/transliterated words from other languages
+   - Example: *Vāg vai brahma | vācā hy evedaṃ sarvaṃ sṛṣṭam*
 
 CRITICAL REQUIREMENTS:
 - Process the ENTIRE document in one response
@@ -142,6 +148,24 @@ Text to convert:
                 print(error_msg)
             return False, error_msg
     
+    def _detect_non_english_text(self, text: str) -> str:
+        """Detect and italicize non-English and transliterated text."""
+        import re
+        
+        # Pattern for Sanskrit transliteration with diacritical marks
+        diacritical_pattern = r'[āīūṛṝḷḹēōṃḥśṣṇḍṭñ]'
+        
+        # Pattern for common non-Latin scripts
+        non_latin_pattern = r'[\u0900-\u097F]|[\u0980-\u09FF]|[\u0A00-\u0A7F]|[\u0600-\u06FF]|[\u4E00-\u9FFF]|[\u3040-\u309F]|[\u30A0-\u30FF]'
+        
+        # Check if text contains diacritical marks or non-Latin scripts
+        if re.search(diacritical_pattern, text, re.IGNORECASE) or re.search(non_latin_pattern, text):
+            # Check if it's not already italicized
+            if not (text.startswith('*') and text.endswith('*')):
+                return f"*{text}*"
+        
+        return text
+    
     def _simple_text_to_markdown(self, text_content: str) -> str:
         """Simple fallback conversion from text to markdown."""
         lines = text_content.split('\n')
@@ -174,10 +198,12 @@ Text to convert:
                 markdown_lines.append(stripped)
                 in_list = True
             else:
-                # Regular paragraph
+                # Regular paragraph - check for non-English text
                 if in_list and stripped:
                     markdown_lines.append('')
-                markdown_lines.append(line)
+                # Apply italicization to non-English text
+                processed_line = self._detect_non_english_text(line)
+                markdown_lines.append(processed_line)
                 in_list = False
         
         return '\n'.join(markdown_lines)
@@ -229,6 +255,29 @@ Text to convert:
             if self.show_progress:
                 print(f"   Processing chunk {i+1}/{len(chunks)}...")
             
+            # Send notification for chunk progress
+            try:
+                percent = int((i / len(chunks)) * 100)
+                notification_msg = f"Processing chunk {i+1} of {len(chunks)} ({percent}% complete)"
+                
+                # Try terminal-notifier first if available
+                if subprocess.run(['which', 'terminal-notifier'], capture_output=True).returncode == 0:
+                    subprocess.run([
+                        'terminal-notifier',
+                        '-title', 'AI Document Converter',
+                        '-subtitle', 'Analyzing text structure...',
+                        '-message', notification_msg,
+                        '-sender', 'com.apple.finder'
+                    ], capture_output=True, timeout=1)
+                else:
+                    # Fallback to osascript
+                    subprocess.run([
+                        'osascript', '-e',
+                        f'display notification "{notification_msg}" with title "AI Document Converter" subtitle "Analyzing text structure..."'
+                    ], capture_output=True, timeout=1)
+            except:
+                pass  # Silently fail if notification fails
+            
             prompt = self._create_analysis_prompt(chunk)
             success, result = self._call_claude(prompt)
             
@@ -244,6 +293,30 @@ Text to convert:
                 if self.show_progress:
                     print(f"   ⚠️ Chunk {i+1} failed, using simple conversion")
                 markdown_chunks.append(self._simple_text_to_markdown(chunk))
+        
+        # Send completion notification for chunked processing
+        if len(chunks) > 1:
+            try:
+                completion_msg = f"All {len(chunks)} chunks processed successfully!"
+                
+                # Try terminal-notifier first if available
+                if subprocess.run(['which', 'terminal-notifier'], capture_output=True).returncode == 0:
+                    subprocess.run([
+                        'terminal-notifier',
+                        '-title', 'AI Document Converter',
+                        '-subtitle', 'Analysis Complete ✓',
+                        '-message', completion_msg,
+                        '-sound', 'default',
+                        '-sender', 'com.apple.finder'
+                    ], capture_output=True, timeout=1)
+                else:
+                    # Fallback to osascript
+                    subprocess.run([
+                        'osascript', '-e',
+                        f'display notification "{completion_msg}" with title "AI Document Converter" subtitle "Analysis Complete ✓"'
+                    ], capture_output=True, timeout=1)
+            except:
+                pass
         
         # Reassemble the markdown
         return '\n\n'.join(markdown_chunks)

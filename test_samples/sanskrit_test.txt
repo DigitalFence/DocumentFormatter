@@ -1,0 +1,39 @@
+Test Document with Sanskrit and Transliterated Text
+
+Introduction
+
+This document contains various examples of non-English text that should be italicized.
+
+Sanskrit Transliteration Examples
+
+The ancient verse says: Vāg vai brahma | vācā hy evedaṃ sarvaṃ sṛṣṭam | vācā hy evedaṃ sarvaṃ bhavati ||
+
+Another important shloka: Oṃ bhūr bhuvaḥ svaḥ tat savitur vareṇyaṃ bhargo devasya dhīmahi dhiyo yo naḥ pracodayāt
+
+The concept of dharma is central to Indian philosophy, as is karma and mokṣa.
+
+Devanagari Script Examples
+
+हिन्दी में: यह एक परीक्षण वाक्य है।
+
+संस्कृत में: सत्यमेव जयते नानृतम्
+
+Mixed Language Examples
+
+The teacher said "नमस्ते" (namaste) to greet the students.
+
+In the Bhagavad Gītā, Krishna tells Arjuna about निष्काम कर्म (niṣkāma karma).
+
+Other Scripts
+
+Arabic: السلام عليكم
+Chinese: 你好世界
+Japanese: こんにちは
+
+Regular English Text
+
+This is regular English text that should not be italicized. It contains normal words without any special characters or diacritical marks.
+
+Conclusion
+
+The integration of Sanskrit terms like ātman, brahman, and sūtra into English discourse requires careful formatting.
