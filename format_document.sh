@@ -12,6 +12,10 @@ echo "Script started with arguments: $@"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo "Script directory: $SCRIPT_DIR"
 
+# Set the reference format document path
+REFERENCE_FORMAT="$SCRIPT_DIR/referenceformat.docx"
+echo "Using reference format: $REFERENCE_FORMAT"
+
 # Check virtual environment
 if [ ! -d "$SCRIPT_DIR/venv" ]; then
     echo "ERROR: Virtual environment not found at $SCRIPT_DIR/venv"
@@ -119,7 +123,9 @@ for file in "$@"; do
             
             # Export the claude path so Python subprocess can find it
             export CLAUDE_CLI_PATH="$claude_path"
-            python "$SCRIPT_DIR/document_converter_ai.py" "$file"
+            # Enable debug logging
+            export WORD_FORMATTER_DEBUG=1
+            python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" "$file"
             converter_exit_code=$?
             echo "AI converter exit code: $converter_exit_code"
             
@@ -141,7 +147,9 @@ for file in "$@"; do
             filename=$(basename "$file")
             send_notification "Word Formatter" "Fallback Mode" "Claude AI not available, using simple conversion for $filename" "Submarine"
             
-            python "$SCRIPT_DIR/document_converter_simple.py" "$file"
+            # Enable debug logging
+            export WORD_FORMATTER_DEBUG=1
+            python "$SCRIPT_DIR/document_converter_simple.py" --reference "$REFERENCE_FORMAT" "$file"
             converter_exit_code=$?
             echo "Simple converter exit code: $converter_exit_code"
             

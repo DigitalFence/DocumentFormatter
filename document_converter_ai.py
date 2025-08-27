@@ -475,29 +475,41 @@ Text to convert:
 
 def main():
     """Main entry point for AI-enhanced converter."""
-    if len(sys.argv) < 2:
-        print("Usage: python document_converter_ai.py <input_file> [output_file]")
-        sys.exit(1)
+    import argparse
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    parser = argparse.ArgumentParser(description='AI-enhanced document converter')
+    parser.add_argument('input_file', help='Input file to convert')
+    parser.add_argument('output_file', nargs='?', help='Output file path (optional)')
+    parser.add_argument('--reference', '-r', help='Reference format document path')
     
-    # Find reference format file
-    script_dir = Path(__file__).parent
-    reference_path = script_dir / "referenceformat.docx"
+    args = parser.parse_args()
     
-    if not reference_path.exists():
-        reference_path = Path.home() / "Documents" / "referenceformat.docx"
+    input_file = args.input_file
+    output_file = args.output_file
     
-    if not reference_path.exists():
-        reference_path = Path.home() / "Desktop" / "referenceformat.docx"
-    
-    if not reference_path.exists():
-        print("Error: Reference format file not found. Please place 'referenceformat.docx' in one of these locations:")
-        print(f"  - {script_dir}")
-        print(f"  - {Path.home() / 'Documents'}")
-        print(f"  - {Path.home() / 'Desktop'}")
-        sys.exit(1)
+    # Use reference format from argument or find default
+    if args.reference:
+        reference_path = Path(args.reference)
+        if not reference_path.exists():
+            print(f"Error: Reference format file not found: {args.reference}")
+            sys.exit(1)
+    else:
+        # Find default reference format file
+        script_dir = Path(__file__).parent
+        reference_path = script_dir / "referenceformat.docx"
+        
+        if not reference_path.exists():
+            reference_path = Path.home() / "Documents" / "referenceformat.docx"
+        
+        if not reference_path.exists():
+            reference_path = Path.home() / "Desktop" / "referenceformat.docx"
+        
+        if not reference_path.exists():
+            print("Error: Reference format file not found. Please place 'referenceformat.docx' in one of these locations:")
+            print(f"  - {script_dir}")
+            print(f"  - {Path.home() / 'Documents'}")
+            print(f"  - {Path.home() / 'Desktop'}")
+            sys.exit(1)
     
     # Create converter and process
     converter = AIDocumentConverter(str(reference_path))

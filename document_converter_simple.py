@@ -11,32 +11,41 @@ from document_converter import DocumentConverter
 
 def main():
     """Simple entry point that uses hardcoded reference file."""
+    import argparse
     
-    # Get input file from command line
-    if len(sys.argv) < 2:
-        print("Error: No input file provided")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Simple document converter')
+    parser.add_argument('input_file', help='Input file to convert')
+    parser.add_argument('--reference', '-r', help='Reference format document path')
     
-    input_path = Path(sys.argv[1])
+    args = parser.parse_args()
     
-    # Look for reference file in the same directory as this script
-    script_dir = Path(__file__).parent
-    reference_path = script_dir / "referenceformat.docx"
+    input_path = Path(args.input_file)
     
-    # If not found in script directory, try user's Documents folder
-    if not reference_path.exists():
-        reference_path = Path.home() / "Documents" / "referenceformat.docx"
-    
-    # If still not found, try Desktop
-    if not reference_path.exists():
-        reference_path = Path.home() / "Desktop" / "referenceformat.docx"
-    
-    if not reference_path.exists():
-        print(f"Error: Reference format file not found. Please place 'referenceformat.docx' in one of these locations:")
-        print(f"  - {script_dir}")
-        print(f"  - {Path.home() / 'Documents'}")
-        print(f"  - {Path.home() / 'Desktop'}")
-        sys.exit(1)
+    # Use reference format from argument or find default
+    if args.reference:
+        reference_path = Path(args.reference)
+        if not reference_path.exists():
+            print(f"Error: Reference format file not found: {args.reference}")
+            sys.exit(1)
+    else:
+        # Look for reference file in the same directory as this script
+        script_dir = Path(__file__).parent
+        reference_path = script_dir / "referenceformat.docx"
+        
+        # If not found in script directory, try user's Documents folder
+        if not reference_path.exists():
+            reference_path = Path.home() / "Documents" / "referenceformat.docx"
+        
+        # If still not found, try Desktop
+        if not reference_path.exists():
+            reference_path = Path.home() / "Desktop" / "referenceformat.docx"
+        
+        if not reference_path.exists():
+            print(f"Error: Reference format file not found. Please place 'referenceformat.docx' in one of these locations:")
+            print(f"  - {script_dir}")
+            print(f"  - {Path.home() / 'Documents'}")
+            print(f"  - {Path.home() / 'Desktop'}")
+            sys.exit(1)
     
     if not input_path.exists():
         print(f"Error: Input file does not exist: {input_path}")

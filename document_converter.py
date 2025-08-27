@@ -173,6 +173,7 @@ class StyleExtractor:
         """Extract the normal/body text style."""
         normal_style = {}
         
+        # First try to get from style definition
         for style in self.reference_doc.styles:
             if style.name == 'Normal':
                 normal_style = {
@@ -189,6 +190,21 @@ class StyleExtractor:
                         'line_spacing': style.paragraph_format.line_spacing
                     }
                 }
+                break
+        
+        # Override with actual font used in Normal style paragraphs
+        for para in self.reference_doc.paragraphs:
+            if para.style.name == 'Normal' and para.runs and para.text.strip():
+                for run in para.runs:
+                    if run.text.strip():
+                        # Use the actual font from the document
+                        normal_style['font'] = {
+                            'name': run.font.name or normal_style.get('font', {}).get('name'),
+                            'size': run.font.size or normal_style.get('font', {}).get('size'),
+                            'bold': run.font.bold if run.font.bold is not None else normal_style.get('font', {}).get('bold'),
+                            'italic': run.font.italic if run.font.italic is not None else normal_style.get('font', {}).get('italic')
+                        }
+                        break
                 break
         
         return normal_style
@@ -227,6 +243,44 @@ class StyleExtractor:
         print("\n" + "="*60)
         print("REFERENCE DOCUMENT STYLES EXTRACTED")
         print("="*60)
+        
+        # Show actual fonts used in the document
+        print("\n🔍 ACTUAL FONTS DETECTED IN DOCUMENT:")
+        font_usage = {}
+        for para in self.reference_doc.paragraphs[:20]:  # Sample first 20 paragraphs
+            if para.runs and para.text.strip():
+                for run in para.runs:
+                    if run.text.strip() and run.font.name:
+                        font_name = run.font.name
+                        if font_name not in font_usage:
+                            font_usage[font_name] = {
+                                'count': 0,
+                                'sizes': set(),
+                                'styles': {'bold': False, 'italic': False}
+                            }
+                        font_usage[font_name]['count'] += 1
+                        if run.font.size:
+                            font_usage[font_name]['sizes'].add(run.font.size)
+                        if run.font.bold:
+                            font_usage[font_name]['styles']['bold'] = True
+                        if run.font.italic:
+                            font_usage[font_name]['styles']['italic'] = True
+        
+        for font_name, usage in font_usage.items():
+            print(f"  {font_name}:")
+            print(f"    Used {usage['count']} times")
+            if usage['sizes']:
+                sizes_pt = [f"{s/12700:.1f}pt" for s in sorted(usage['sizes'])]
+                print(f"    Sizes: {', '.join(sizes_pt)}")
+            if usage['styles']['bold'] or usage['styles']['italic']:
+                styles = []
+                if usage['styles']['bold']:
+                    styles.append('Bold')
+                if usage['styles']['italic']:
+                    styles.append('Italic')
+                print(f"    Styles: {', '.join(styles)}")
+        
+        print("\n" + "="*60)
         
         # Document-level styles
         if 'document' in self.styles:
