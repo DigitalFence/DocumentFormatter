@@ -1,0 +1,13 @@
+Chapter 1: Test Chapter
+
+This is a simple blockquote test:
+
+Vāg vai brahma | vācā hy evedaṃ sarvaṃ sṛṣṭam | vācā hy evedaṃ sarvaṃ bhavati ||
+
+Speech indeed is Brahman. By speech alone is all this created. By speech alone does all this exist.
+
+— Aitareya Brāhmaṇa 33.6
+
+This should appear only once after the blockquote.
+
+The End.

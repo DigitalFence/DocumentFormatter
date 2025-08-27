@@ -425,12 +425,18 @@ class DocumentConverter:
         # Parse HTML
         soup = BeautifulSoup(html, 'html.parser')
         
+        # Track processed elements to avoid duplicates
+        processed_elements = set()
+        
         # Process each element
         for element in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'blockquote', 'ul', 'ol', 'table', 'pre']):
-            self._process_html_element(element)
+            self._process_html_element(element, processed_elements)
     
-    def _process_html_element(self, element):
+    def _process_html_element(self, element, processed_elements):
         """Process individual HTML elements."""
+        # Skip if already processed (to avoid duplicates in blockquotes)
+        if id(element) in processed_elements:
+            return
         if element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
             level = int(element.name[1])
             heading_text = element.get_text().strip()
@@ -451,38 +457,56 @@ class DocumentConverter:
         
         elif element.name == 'blockquote':
             # Handle blockquotes (Sanskrit quotes, etc.)
-            para = self.output_doc.add_paragraph()
-            # Center align blockquotes
-            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            para.paragraph_format.space_before = Pt(12)
-            para.paragraph_format.space_after = Pt(12)
+            paragraphs = element.find_all('p')
             
-            # Process blockquote content
-            for child in element.children:
-                if hasattr(child, 'name'):
-                    if child.name == 'p':
-                        # Process paragraph within blockquote
-                        text = child.get_text().strip()
-                        if text:
-                            if text.startswith('—'):
-                                # Source citation - make it italic and smaller
-                                run = para.add_run(text)
-                                run.italic = True
-                                if run.font.size:
-                                    run.font.size = Pt(10)
-                            else:
-                                # Check for italics in the original
-                                if child.find('em') or child.find('i'):
-                                    run = para.add_run(child.get_text().strip())
-                                    run.italic = True
-                                else:
-                                    para.add_run(child.get_text().strip())
+            if paragraphs:
+                # Mark all child paragraphs as processed to avoid duplicates
+                for p_elem in paragraphs:
+                    processed_elements.add(id(p_elem))
+                
+                # Create a single centered paragraph for the entire blockquote
+                para = self.output_doc.add_paragraph()
+                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                para.paragraph_format.space_before = Pt(12)
+                para.paragraph_format.space_after = Pt(12)
+                
+                # Track if we're processing the transliteration (first non-source paragraph)
+                transliteration_processed = False
+                
+                for i, p_elem in enumerate(paragraphs):
+                    text = p_elem.get_text().strip()
+                    if text:
+                        # Add line break between paragraphs (except for the first)
+                        if i > 0:
                             para.add_run('\n')
-                else:
-                    # Plain text in blockquote
-                    if str(child).strip():
-                        para.add_run(str(child).strip())
-                        para.add_run('\n')
+                            # Add extra gap between transliteration and translation
+                            if i == 1 and not text.startswith('—'):
+                                para.add_run('\n')
+                        
+                        if text.startswith('—'):
+                            # Source citation - make it italic and smaller
+                            run = para.add_run(text)
+                            run.italic = True
+                            run.font.size = Pt(10)
+                        else:
+                            # Check if the paragraph contains em/i tags
+                            if p_elem.find('em') or p_elem.find('i'):
+                                # Process inline elements to preserve italic formatting
+                                for child in p_elem.children:
+                                    if hasattr(child, 'name'):
+                                        if child.name in ['em', 'i']:
+                                            run = para.add_run(child.get_text())
+                                            run.italic = True
+                                        else:
+                                            para.add_run(child.get_text())
+                                    else:
+                                        # Plain text
+                                        text_content = str(child).strip()
+                                        if text_content:
+                                            para.add_run(text_content)
+                            else:
+                                # Plain text paragraph
+                                para.add_run(text)
             
         elif element.name == 'p':
             para = self.output_doc.add_paragraph()
