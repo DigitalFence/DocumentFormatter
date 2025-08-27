@@ -42,9 +42,11 @@ Thumbs.db
 Icon
 ._*
 
-# Word documents (generated output)
-*_formatted.docx
-*_formatted.doc
+# Word documents (ALL - both input and output)
+*.docx
+*.doc
+*.DOCX
+*.DOC
 
 # Markdown (generated intermediate files)
 *_markdown.md
