@@ -159,9 +159,11 @@ The Word Formatter provides real-time notifications during conversion:
 When processing plain text files, the AI enhancement:
 - Detects heading structures
 - Identifies lists and bullet points
-- Recognizes quotes and citations
+- Recognizes quotes and citations (with special handling for Sanskrit, multilingual content)
+- Automatically italicizes transliterated and non-English text
 - Preserves intentional formatting
 - Adds semantic structure
+- Handles Unicode characters and diacritical marks
 
 ## Troubleshooting
 
