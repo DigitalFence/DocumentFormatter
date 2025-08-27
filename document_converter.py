@@ -43,6 +43,7 @@ class StyleExtractor:
     def __init__(self, reference_doc_path: str):
         self.reference_doc = Document(reference_doc_path)
         self.styles = self._extract_styles()
+        self._log_extracted_styles()
     
     def _extract_styles(self) -> Dict:
         """Extract all relevant styles from the reference document."""
@@ -213,6 +214,104 @@ class StyleExtractor:
                 }
         
         return list_styles
+    
+    def _log_extracted_styles(self):
+        """Log all extracted styles for debugging."""
+        import json
+        import os
+        
+        # Only log if debug mode is enabled
+        if os.environ.get('WORD_FORMATTER_DEBUG', '0') != '1':
+            return
+            
+        print("\n" + "="*60)
+        print("REFERENCE DOCUMENT STYLES EXTRACTED")
+        print("="*60)
+        
+        # Document-level styles
+        if 'document' in self.styles:
+            print("\n📄 DOCUMENT SETTINGS:")
+            doc = self.styles['document']
+            if 'margins' in doc:
+                margins = doc['margins']
+                print(f"  Margins:")
+                print(f"    Top: {margins.get('top', 'Not set')}")
+                print(f"    Bottom: {margins.get('bottom', 'Not set')}")
+                print(f"    Left: {margins.get('left', 'Not set')}")
+                print(f"    Right: {margins.get('right', 'Not set')}")
+            if 'page_width' in doc:
+                print(f"  Page Width: {doc['page_width']}")
+            if 'page_height' in doc:
+                print(f"  Page Height: {doc['page_height']}")
+        
+        # Normal style
+        if 'normal' in self.styles and self.styles['normal']:
+            print("\n📝 NORMAL (BODY) STYLE:")
+            normal = self.styles['normal']
+            if 'font' in normal:
+                font = normal['font']
+                print(f"  Font:")
+                print(f"    Name: {font.get('name', 'Default')}")
+                print(f"    Size: {font.get('size', 'Default')}")
+                print(f"    Bold: {font.get('bold', False)}")
+                print(f"    Italic: {font.get('italic', False)}")
+            if 'paragraph' in normal:
+                para = normal['paragraph']
+                print(f"  Paragraph:")
+                print(f"    Alignment: {para.get('alignment', 'Default')}")
+                print(f"    Space Before: {para.get('space_before', 0)}")
+                print(f"    Space After: {para.get('space_after', 0)}")
+                print(f"    Line Spacing: {para.get('line_spacing', 'Default')}")
+        
+        # Heading styles
+        if 'headings' in self.styles:
+            print("\n📌 HEADING STYLES:")
+            for heading_name, heading_style in self.styles['headings'].items():
+                print(f"\n  {heading_name}:")
+                if 'font' in heading_style:
+                    font = heading_style['font']
+                    print(f"    Font: {font.get('name', 'Default')}")
+                    print(f"    Size: {font.get('size', 'Default')}")
+                    print(f"    Bold: {font.get('bold', False)}")
+                    print(f"    Color: {font.get('color', 'Default')}")
+                if 'paragraph' in heading_style:
+                    para = heading_style['paragraph']
+                    print(f"    Space Before: {para.get('space_before', 0)}")
+                    print(f"    Space After: {para.get('space_after', 0)}")
+                    print(f"    Keep with Next: {para.get('keep_with_next', False)}")
+                    print(f"    Page Break Before: {para.get('page_break_before', False)}")
+        
+        # List styles
+        if 'lists' in self.styles:
+            print("\n📋 LIST STYLES:")
+            lists = self.styles['lists']
+            if 'bullet' in lists:
+                print(f"  Bullet List:")
+                print(f"    Indent: {lists['bullet'].get('indent', 'Default')}")
+                if lists['bullet'].get('font'):
+                    font = lists['bullet']['font']
+                    print(f"    Font: {font.get('name', 'Default')}")
+                    print(f"    Size: {font.get('size', 'Default')}")
+            if 'numbered' in lists:
+                print(f"  Numbered List:")
+                print(f"    Indent: {lists['numbered'].get('indent', 'Default')}")
+                if lists['numbered'].get('font'):
+                    font = lists['numbered']['font']
+                    print(f"    Font: {font.get('name', 'Default')}")
+                    print(f"    Size: {font.get('size', 'Default')}")
+        
+        # Paragraph styles summary
+        if 'paragraphs' in self.styles:
+            print(f"\n📊 PARAGRAPH STYLES COLLECTED: {len(self.styles['paragraphs'])} unique styles")
+            style_names = set()
+            for para_style in self.styles['paragraphs']:
+                if para_style.get('style_name'):
+                    style_names.add(para_style['style_name'])
+            if style_names:
+                print(f"  Style names found: {', '.join(sorted(style_names))}")
+        
+        print("\n" + "="*60)
+        print()
 
 
 class DocumentConverter:
