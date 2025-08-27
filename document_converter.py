@@ -77,9 +77,12 @@ class StyleExtractor:
     def _get_paragraph_styles(self) -> List[Dict]:
         """Extract paragraph styles from the document."""
         paragraph_styles = []
+        seen_styles = set()
         
-        for para in self.reference_doc.paragraphs[:10]:  # Sample first 10 paragraphs
-            if para.text.strip():
+        for para in self.reference_doc.paragraphs:
+            if para.text.strip() and para.style.name not in seen_styles:
+                seen_styles.add(para.style.name)
+                
                 style = {
                     'alignment': para.alignment,
                     'left_indent': para.paragraph_format.left_indent,
@@ -91,19 +94,30 @@ class StyleExtractor:
                     'style_name': para.style.name if para.style else None
                 }
                 
-                # Extract run formatting from first run
+                # Extract run formatting from all runs to get most common style
                 if para.runs:
-                    run = para.runs[0]
-                    style['font'] = {
-                        'name': run.font.name,
-                        'size': run.font.size,
-                        'bold': run.font.bold,
-                        'italic': run.font.italic,
-                        'underline': run.font.underline,
-                        'color': run.font.color.rgb if run.font.color else None
-                    }
+                    # Get the most common font properties
+                    fonts = []
+                    for run in para.runs:
+                        if run.text.strip():
+                            fonts.append({
+                                'name': run.font.name,
+                                'size': run.font.size,
+                                'bold': run.font.bold,
+                                'italic': run.font.italic,
+                                'underline': run.font.underline,
+                                'color': run.font.color.rgb if run.font.color else None
+                            })
+                    
+                    # Use the first non-empty run's style
+                    if fonts:
+                        style['font'] = fonts[0]
                 
                 paragraph_styles.append(style)
+                
+                # Stop after collecting enough unique styles
+                if len(paragraph_styles) >= 20:
+                    break
         
         return paragraph_styles
     
@@ -125,10 +139,33 @@ class StyleExtractor:
                         'alignment': style.paragraph_format.alignment,
                         'space_before': style.paragraph_format.space_before,
                         'space_after': style.paragraph_format.space_after,
-                        'keep_with_next': style.paragraph_format.keep_with_next
+                        'keep_with_next': style.paragraph_format.keep_with_next,
+                        'page_break_before': style.paragraph_format.page_break_before,
+                        'left_indent': style.paragraph_format.left_indent,
+                        'right_indent': style.paragraph_format.right_indent,
+                        'first_line_indent': style.paragraph_format.first_line_indent
                     }
                 }
         
+        # Also extract Title style if present
+        for style in self.reference_doc.styles:
+            if style.type == WD_STYLE_TYPE.PARAGRAPH and style.name == 'Title':
+                heading_styles['Title'] = {
+                    'font': {
+                        'name': style.font.name,
+                        'size': style.font.size,
+                        'bold': style.font.bold,
+                        'italic': style.font.italic,
+                        'color': style.font.color.rgb if style.font.color else None
+                    },
+                    'paragraph': {
+                        'alignment': style.paragraph_format.alignment,
+                        'space_before': style.paragraph_format.space_before,
+                        'space_after': style.paragraph_format.space_after,
+                        'page_break_before': style.paragraph_format.page_break_before
+                    }
+                }
+                
         return heading_styles
     
     def _get_normal_style(self) -> Dict:
@@ -157,11 +194,25 @@ class StyleExtractor:
     
     def _get_list_styles(self) -> Dict:
         """Extract list formatting styles."""
-        # This is simplified - full list style extraction is complex
-        return {
-            'bullet': {'indent': Pt(36)},
-            'numbered': {'indent': Pt(36)}
+        list_styles = {
+            'bullet': {'indent': Pt(36), 'font': None},
+            'numbered': {'indent': Pt(36), 'font': None}
         }
+        
+        # Try to extract actual list styles from reference document
+        for style in self.reference_doc.styles:
+            if style.name == 'List Bullet' and hasattr(style, 'font'):
+                list_styles['bullet']['font'] = {
+                    'name': style.font.name,
+                    'size': style.font.size
+                }
+            elif style.name == 'List Number' and hasattr(style, 'font'):
+                list_styles['numbered']['font'] = {
+                    'name': style.font.name,
+                    'size': style.font.size
+                }
+        
+        return list_styles
 
 
 class DocumentConverter:
@@ -229,7 +280,21 @@ class DocumentConverter:
         """Process individual HTML elements."""
         if element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
             level = int(element.name[1])
-            heading = self.output_doc.add_heading(element.get_text().strip(), level=level)
+            heading_text = element.get_text().strip()
+            
+            # Check if this is a chapter heading (typically H1 or contains "Chapter")
+            if level == 1 or 'chapter' in heading_text.lower():
+                # Add page break before chapter (except for the first heading)
+                if len(self.output_doc.paragraphs) > 0:
+                    self.output_doc.add_page_break()
+            
+            heading = self.output_doc.add_heading(heading_text, level=level)
+            
+            # Apply special formatting for chapter headings
+            if level == 1 or 'chapter' in heading_text.lower():
+                heading.paragraph_format.space_before = Pt(24)
+                heading.paragraph_format.space_after = Pt(18)
+                heading.paragraph_format.keep_with_next = True
             
         elif element.name == 'p':
             para = self.output_doc.add_paragraph()
@@ -351,6 +416,16 @@ class DocumentConverter:
                 paragraph.paragraph_format.space_after = para_format['space_after']
             if para_format.get('line_spacing'):
                 paragraph.paragraph_format.line_spacing = para_format['line_spacing']
+            if para_format.get('left_indent'):
+                paragraph.paragraph_format.left_indent = para_format['left_indent']
+            if para_format.get('right_indent'):
+                paragraph.paragraph_format.right_indent = para_format['right_indent']
+            if para_format.get('first_line_indent'):
+                paragraph.paragraph_format.first_line_indent = para_format['first_line_indent']
+            if para_format.get('keep_with_next'):
+                paragraph.paragraph_format.keep_with_next = para_format['keep_with_next']
+            if para_format.get('page_break_before'):
+                paragraph.paragraph_format.page_break_before = para_format['page_break_before']
         
         # Apply font formatting to all runs
         if 'font' in style and paragraph.runs:
