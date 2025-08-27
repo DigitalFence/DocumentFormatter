@@ -25,7 +25,8 @@ class AIDocumentConverter:
         self.save_markdown = os.environ.get('SAVE_MARKDOWN', '1') == '1'  # Default: save markdown
         self.show_progress = os.environ.get('SHOW_PROGRESS', '1') == '1'  # Default: show progress
         self.model = os.environ.get('CLAUDE_MODEL', 'sonnet')  # Default: sonnet
-        self.timeout = int(os.environ.get('CLAUDE_TIMEOUT', '120'))  # Default: 120 seconds
+        self.timeout = int(os.environ.get('CLAUDE_TIMEOUT', '600'))  # Default: 600 seconds (10 minutes)
+        self.enable_haiku_fallback = os.environ.get('ENABLE_HAIKU_FALLBACK', '1') == '1'  # Default: enabled
     
     def _create_analysis_prompt(self, text_content: str) -> str:
         """Create the prompt for Claude to analyze and structure text."""
@@ -41,45 +42,76 @@ Instructions:
 7. Format code blocks if you detect code snippets
 8. Identify tables and convert to markdown table format
 
+CRITICAL REQUIREMENTS:
+- Process the ENTIRE document in one response
+- Do NOT ask for confirmation or permission to continue
+- Do NOT break the response into parts or sections
+- Do NOT stop midway through the document
+- Convert ALL text provided, regardless of length
+- No explanations, questions, or meta-commentary
+- Return ONLY the complete markdown formatted text
+
 Important:
 - Do not add any content that wasn't in the original
 - Maintain the original tone and style
 - Focus on structure, not rewriting
 - If the text already has clear structure, preserve it
 
-Return only the markdown formatted text, no explanations.
-
 Text to convert:
 ---
 {text_content}
 ---"""
     
-    def _call_claude(self, prompt: str) -> Tuple[bool, str]:
+    def _call_claude(self, prompt: str, model: str = None) -> Tuple[bool, str]:
         """Call Claude CLI and return success status and output."""
+        if model is None:
+            model = self.model
+            
         try:
             # Show progress if enabled
             if self.show_progress:
-                print(f"🤖 Using Claude {self.model.upper()} model for AI analysis...")
+                print(f"🤖 Using Claude {model.upper()} model for AI analysis...")
             elif self.debug:
-                print(f"Calling Claude ({self.model}) for text analysis...")
+                print(f"Calling Claude ({model}) for text analysis...")
             
             # Use explicit Claude path if provided, otherwise use 'claude' from PATH
             claude_cmd = os.environ.get('CLAUDE_CLI_PATH', 'claude')
             
             # Use Claude in print mode for non-interactive output
             result = subprocess.run(
-                [claude_cmd, '--model', self.model, '--print', prompt],
+                [claude_cmd, '--model', model, '--print', prompt],
                 capture_output=True,
                 text=True,
                 timeout=self.timeout
             )
             
             if result.returncode == 0 and result.stdout.strip():
+                output = result.stdout.strip()
+                
+                # Check for incomplete response patterns
+                incomplete_patterns = [
+                    "Would you like me to continue",
+                    "Shall I proceed",
+                    "Should I continue",
+                    "Let me know if",
+                    "I can continue",
+                    "break it down into",
+                    "manageable sections"
+                ]
+                
+                if any(pattern.lower() in output.lower() for pattern in incomplete_patterns):
+                    error_msg = "Claude returned an incomplete response (asked for confirmation)"
+                    if self.show_progress:
+                        print(f"⚠️  {error_msg}")
+                    elif self.debug:
+                        print(error_msg)
+                    return False, error_msg
+                
                 if self.show_progress:
                     print("✓ AI analysis completed successfully")
                 elif self.debug:
                     print("Claude analysis successful")
-                return True, result.stdout.strip()
+                return True, output
             else:
                 error_msg = result.stderr or "Unknown error"
                 if self.show_progress:
@@ -89,7 +121,7 @@ Text to convert:
                 return False, error_msg
                 
         except subprocess.TimeoutExpired:
-            error_msg = f"Claude analysis timed out after {self.timeout} seconds"
+            error_msg = f"Claude {model.upper()} analysis timed out after {self.timeout} seconds"
             if self.show_progress:
                 print(f"⏱️  {error_msg}")
             elif self.debug:
@@ -150,6 +182,72 @@ Text to convert:
         
         return '\n'.join(markdown_lines)
     
+    def _process_in_chunks(self, text_content: str, chunk_size: int = 20000) -> str:
+        """Process large text in chunks and reassemble."""
+        if len(text_content) <= chunk_size:
+            # Small enough to process in one go
+            prompt = self._create_analysis_prompt(text_content)
+            success, result = self._call_claude(prompt)
+            
+            # Try Haiku if initial model times out
+            if not success and "timed out" in result and self.enable_haiku_fallback and self.model != 'haiku':
+                if self.show_progress:
+                    print(f"🔄 Trying faster Haiku model...")
+                success, result = self._call_claude(prompt, 'haiku')
+                if success:
+                    self.model = 'haiku'
+            
+            return result if success else None
+        
+        # Split into chunks at paragraph boundaries
+        paragraphs = text_content.split('\n\n')
+        chunks = []
+        current_chunk = []
+        current_size = 0
+        
+        for para in paragraphs:
+            para_size = len(para)
+            if current_size + para_size > chunk_size and current_chunk:
+                # Save current chunk and start new one
+                chunks.append('\n\n'.join(current_chunk))
+                current_chunk = [para]
+                current_size = para_size
+            else:
+                current_chunk.append(para)
+                current_size += para_size
+        
+        # Don't forget the last chunk
+        if current_chunk:
+            chunks.append('\n\n'.join(current_chunk))
+        
+        if self.show_progress:
+            print(f"📦 Processing {len(chunks)} chunks...")
+        
+        # Process each chunk
+        markdown_chunks = []
+        for i, chunk in enumerate(chunks):
+            if self.show_progress:
+                print(f"   Processing chunk {i+1}/{len(chunks)}...")
+            
+            prompt = self._create_analysis_prompt(chunk)
+            success, result = self._call_claude(prompt)
+            
+            if not success and "timed out" in result and self.enable_haiku_fallback:
+                if self.show_progress:
+                    print(f"   🔄 Retrying chunk {i+1} with Haiku...")
+                success, result = self._call_claude(prompt, 'haiku')
+            
+            if success:
+                markdown_chunks.append(result)
+            else:
+                # Fallback to simple conversion for this chunk
+                if self.show_progress:
+                    print(f"   ⚠️ Chunk {i+1} failed, using simple conversion")
+                markdown_chunks.append(self._simple_text_to_markdown(chunk))
+        
+        # Reassemble the markdown
+        return '\n\n'.join(markdown_chunks)
+    
     def convert_with_ai(self, input_path: str, output_path: Optional[str] = None) -> bool:
         """Convert document using AI analysis."""
         input_path = Path(input_path)
@@ -195,11 +293,17 @@ Text to convert:
                     print(f"🔍 Analyzing document structure...")
                 elif not self.debug:
                     print(f"Analyzing document structure with AI...")
-                    
-                prompt = self._create_analysis_prompt(text_content)
-                success, result = self._call_claude(prompt)
                 
-                if success:
+                # Check if chunking is needed
+                chunk_threshold = int(os.environ.get('CHUNK_THRESHOLD', '10000'))  # Changed to 10KB
+                if len(text_content) > chunk_threshold:
+                    if self.show_progress:
+                        print(f"📊 Document size: {len(text_content):,} chars, using chunked processing...")
+                
+                # Use chunking method which handles both small and large files
+                result = self._process_in_chunks(text_content, chunk_threshold)
+                
+                if result:
                     markdown_content = result
                     if self.debug:
                         print("Using AI-generated markdown")
@@ -216,9 +320,9 @@ Text to convert:
                     # Fallback to simple conversion
                     if self.show_progress:
                         print(f"⚡ Falling back to simple text conversion")
-                        print(f"   Reason: {result}")
+                        print(f"   Reason: All AI attempts failed")
                     else:
-                        print(f"AI analysis unavailable: {result}")
+                        print(f"AI analysis unavailable")
                         print("Using simple text conversion...")
                     markdown_content = self._simple_text_to_markdown(text_content)
                     use_ai = False
