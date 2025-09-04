@@ -621,6 +621,7 @@ class DocumentConverter:
         
         # Track chapter state for separator placement
         self.current_chapter_started = False
+        self.current_chapter_name = ""
         self.paragraphs_since_chapter = 0
         self.current_chapter_elements = []
         
@@ -713,13 +714,9 @@ class DocumentConverter:
                         if para and para.runs:
                             self._apply_subtle_emphasis(para, closing_settings)
         
-        # Add chapter separator
-        if self.config:
-            separator_settings = self.config.get_chapter_separator()
-        else:
-            separator_settings = None
-        if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
-            self._add_chapter_separator(separator_settings)
+        # Chapter separator will be added when next chapter starts (not here)
+        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+            print("DEBUG: Chapter end processing completed (separator will be added when next chapter starts)")
     
     def _is_chapter_opening_content(self, text: str, position: int) -> bool:
         """Check if this paragraph is chapter opening content (verse/quote)."""
@@ -958,13 +955,16 @@ class DocumentConverter:
             if self.current_chapter_started:
                 self.paragraphs_since_chapter += 1
             
-        # Always handle separator at the very end if we're in a chapter
+        # Add separator at the very end only if this is the final chapter
         if self.current_chapter_started and self.config:
-            # Force add separator at end of document if we're still in a chapter
+            # Add separator at end of final chapter
             separator_settings = self.config.get_chapter_separator()
             if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
                 self._add_chapter_separator(separator_settings)
-                print("Added chapter separator at end of document")
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: Added final chapter separator at end of document for '{self.current_chapter_name}'")
+                else:
+                    print(f"Added separator at end of final chapter: {self.current_chapter_name}")
     
     def _process_html_element(self, element, processed_elements):
         """Process individual HTML elements."""
@@ -1005,6 +1005,16 @@ class DocumentConverter:
                     if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                         print(f"DEBUG: Chapter detected: '{heading_text}' (level={level}, keyword_match={self.config.is_chapter_keyword(heading_text)})")
                     
+                    # Add separator at end of previous chapter if we were in one
+                    if self.current_chapter_started:
+                        separator_settings = self.config.get_chapter_separator()
+                        if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
+                            self._add_chapter_separator(separator_settings)
+                            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                                print(f"DEBUG: Added chapter separator at end of '{self.current_chapter_name}' before starting '{heading_text}'")
+                            else:
+                                print(f"Added separator at end of chapter: {self.current_chapter_name}")
+                    
                     # Simple rule: Always add page break before chapters (H1 headings)
                     if len(self.output_doc.paragraphs) > 0:
                         self.output_doc.add_page_break()
@@ -1017,15 +1027,12 @@ class DocumentConverter:
                         if self.special_sections.get('contents'):
                             self.special_sections['contents'] = False
                     
-                    # Add separator before chapter if configured for "before" position
-                    separator_settings = self.config.get_chapter_separator()
-                    if separator_settings.get('enabled') and separator_settings.get('position') == 'before' and len(self.output_doc.paragraphs) > 0:
-                        self._add_chapter_separator(separator_settings)
-                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                            print(f"DEBUG: Added chapter separator before: '{heading_text}'")
+                    # Don't add separator before chapters - only after
+                    # (The separator is added when starting the next chapter or at end of document)
                     
                     # Mark that we're in a chapter for end-of-chapter separator
                     self.current_chapter_started = True
+                    self.current_chapter_name = heading_text
                     self.paragraphs_since_chapter = 0
                     self.current_chapter_elements = []
                 # For other headings, shift down by 1 if we have chapters at level 2
@@ -1418,6 +1425,23 @@ class DocumentConverter:
                         else:
                             if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                                 print(f"DEBUG: Style '{target_style}' not found, using default")
+                    elif text.strip().startswith('• ') or re.match(r'^\s+• ', text):
+                        # This is a bullet point line in hierarchical list - add proper tab indentation
+                        # Remove leading spaces and replace with tab indentation
+                        bullet_text = text.lstrip()  # Remove leading spaces
+                        if bullet_text.startswith('• '):
+                            # Clear current paragraph content and add with tab indentation
+                            para.clear()
+                            para.add_run('\t' + bullet_text)  # Add tab + bullet point text
+                            
+                            # Apply the bullet point style
+                            bullet_style = hl_settings.get('bullet_point_style', 'List Paragraph')
+                            style_names = [style.name for style in self.output_doc.styles]
+                            if bullet_style in style_names:
+                                para.style = bullet_style
+                            
+                            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                                print(f"DEBUG: Applied tab indentation to bullet point: '{bullet_text[:30]}...'")
                     else:
                         # Check if we've left the hierarchical list section
                         # (e.g., if we encounter a regular paragraph that doesn't match the pattern)

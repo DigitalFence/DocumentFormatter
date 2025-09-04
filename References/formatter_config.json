@@ -87,7 +87,7 @@
         "aspects",
         "dimensions"
       ],
-      "numbered_item_style": "Normal",
+      "numbered_item_style": "List Paragraph",
       "bullet_point_style": "List Paragraph",
       "detection_rules": {
         "numbered_pattern": "^\\d+\\.\\s+[A-Z]",
