@@ -42,13 +42,21 @@ class AIDocumentConverter:
         return f"""Convert the following plain text to well-structured markdown format.
 
 Instructions:
-1. TITLE DETECTION: The first substantial line of text (not a date or other metadata) should be marked as #Heading0
-   - This is typically the document title/name
-   - Use exactly "#Heading0 " followed by the title text
-   - Example: #Heading0 The Complete Guide to Spiritual Wisdom
+1. TITLE DETECTION: 
+   - The document title should be marked as a regular # (H1) heading
+   - Example: # The Complete Guide to Spiritual Wisdom
+   - This will be automatically converted to Title style during processing
 2. Identify and mark other headings based on context and formatting cues:
    - Main sections or parts should use # (H1) - look for "Section", "Part", or similar major divisions
-   - Chapters should use # (H1) - look for "Chapter" followed by numbers or titles
+   - Chapters should use # (H1) - this includes:
+     * Explicit chapters: "Chapter 1", "Chapter One", "Chapter: Title"
+     * Standalone chapter titles: "The Final Thread", "You Are Yet to Meet", "The Journey Begins"
+     * IMPORTANT: All major headings (title, chapters, sections) use # (H1)
+   - Examples of correct formatting:
+     * # The Master (document title)
+     * # Chapter 1: The Foundation (chapter)
+     * # The Master as Pattern Interruptor (chapter)
+     * # You Are Yet to Meet (chapter)
    - Sub-sections within chapters should use ## (H2)
    - Sub-sub-sections should use ### (H3), and so on
 3. Detect lists (both bulleted and numbered) and format appropriately  
@@ -69,10 +77,10 @@ Instructions:
    - Format as centered blockquotes with this pattern:
      > *Sanskrit transliteration in italics*
      > English translation
-     > Source citation
+     > — Source citation (always start with em dash)
    - Use > for blockquote with single line breaks
    - The transliteration should be italicized
-   - Remove any em dashes from citations
+   - ALWAYS use em dash (—) before attribution/source, not hyphen (-)
 11. SPECIAL FORMATTING for hierarchical lists (like roles, principles, qualities):
    - Look for patterns like "Transformational Roles", "Meta Roles", "Principles", "Types", "Aspects", etc.
    - Format these headers using appropriate heading level based on document context (don't force H2)
@@ -101,6 +109,7 @@ CRITICAL REQUIREMENTS:
 - Convert ALL text provided, regardless of length
 - No explanations, questions, or meta-commentary
 - Return ONLY the complete markdown formatted text
+- Use # (H1) for the title and all major headings (chapters, sections)
 
 Important:
 - Do not add any content that wasn't in the original

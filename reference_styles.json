@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "reference_document": "referenceformat.docx",
-    "extraction_date": "2025-09-04T10:02:14.496910",
+    "reference_document": "References/ExtractFrom-2 Echoes of Silence v.2 Claude APOO.docx",
+    "extraction_date": "2025-09-04T16:01:56.260794",
     "document_name": "Untitled",
     "author": "Kamlesh Patel"
   },
@@ -36,21 +36,21 @@
         }
       },
       {
-        "alignment": "CENTER (1)",
+        "alignment": null,
         "left_indent": null,
         "right_indent": null,
         "first_line_indent": null,
         "space_before": null,
         "space_after": null,
-        "line_spacing": "1.3",
+        "line_spacing": null,
         "style_name": "Normal",
         "font": {
-          "name": "Aptos Light",
+          "name": null,
           "size": null,
           "bold": null,
           "italic": null,
           "underline": null,
-          "color": "000000"
+          "color": null
         }
       },
       {
@@ -82,7 +82,7 @@
         }
       },
       {
-        "alignment": "CENTER (1)",
+        "alignment": null,
         "left_indent": null,
         "right_indent": null,
         "first_line_indent": null,
@@ -106,25 +106,7 @@
         "first_line_indent": null,
         "space_before": null,
         "space_after": null,
-        "line_spacing": "1.3",
-        "style_name": "Normal (Web)",
-        "font": {
-          "name": "Aptos Light",
-          "size": null,
-          "bold": null,
-          "italic": null,
-          "underline": null,
-          "color": null
-        }
-      },
-      {
-        "alignment": null,
-        "left_indent": null,
-        "right_indent": null,
-        "first_line_indent": null,
-        "space_before": null,
-        "space_after": null,
-        "line_spacing": "1.3",
+        "line_spacing": null,
         "style_name": "Heading 3",
         "font": {
           "name": null,
@@ -142,8 +124,8 @@
         "first_line_indent": null,
         "space_before": null,
         "space_after": null,
-        "line_spacing": "1.3",
-        "style_name": "Heading 4",
+        "line_spacing": null,
+        "style_name": "Normal (Web)",
         "font": {
           "name": null,
           "size": null,
@@ -160,7 +142,25 @@
         "first_line_indent": null,
         "space_before": null,
         "space_after": null,
-        "line_spacing": "1.3",
+        "line_spacing": null,
+        "style_name": "List Paragraph",
+        "font": {
+          "name": null,
+          "size": null,
+          "bold": null,
+          "italic": null,
+          "underline": null,
+          "color": null
+        }
+      },
+      {
+        "alignment": null,
+        "left_indent": null,
+        "right_indent": null,
+        "first_line_indent": null,
+        "space_before": null,
+        "space_after": null,
+        "line_spacing": null,
         "style_name": "Heading 2",
         "font": {
           "name": null,
@@ -175,7 +175,7 @@
     "headings": {
       "Heading 1": {
         "font": {
-          "name": "Aptos Light",
+          "name": null,
           "size": "16.0pt",
           "bold": null,
           "italic": null,
@@ -194,7 +194,7 @@
       },
       "Heading 2": {
         "font": {
-          "name": "Aptos Light",
+          "name": null,
           "size": "16.0pt",
           "bold": null,
           "italic": null,
@@ -202,8 +202,8 @@
         },
         "paragraph": {
           "alignment": "CENTER (1)",
-          "space_before": "5.0pt",
-          "space_after": "5.0pt",
+          "space_before": null,
+          "space_after": null,
           "keep_with_next": null,
           "page_break_before": null,
           "left_indent": null,
@@ -213,7 +213,7 @@
       },
       "Heading 3": {
         "font": {
-          "name": "Aptos Light",
+          "name": null,
           "size": "14.0pt",
           "bold": null,
           "italic": null,
@@ -232,7 +232,7 @@
       },
       "Heading 4": {
         "font": {
-          "name": "Aptos Light",
+          "name": null,
           "size": "13.0pt",
           "bold": null,
           "italic": "True",
@@ -346,7 +346,7 @@
       },
       "Title": {
         "font": {
-          "name": "Aptos Light",
+          "name": null,
           "size": "28.0pt",
           "bold": null,
           "italic": null,
@@ -369,9 +369,9 @@
       },
       "paragraph": {
         "alignment": null,
-        "space_before": null,
-        "space_after": null,
-        "line_spacing": null
+        "space_before": "5.0pt",
+        "space_after": "5.0pt",
+        "line_spacing": "1.5"
       }
     },
     "lists": {
@@ -393,7 +393,7 @@
       "is_builtin": "True",
       "priority": null,
       "font": {
-        "name": null,
+        "name": "Aptos Light",
         "size": null,
         "bold": null,
         "italic": null,
@@ -406,10 +406,10 @@
         "left_indent": null,
         "right_indent": null,
         "first_line_indent": null,
-        "space_before": null,
-        "space_after": null,
-        "line_spacing": null,
-        "line_spacing_rule": null,
+        "space_before": "5.0pt",
+        "space_after": "5.0pt",
+        "line_spacing": "1.5",
+        "line_spacing_rule": "ONE_POINT_FIVE (1)",
         "keep_with_next": null,
         "keep_together": null,
         "page_break_before": null,
@@ -423,7 +423,7 @@
       "is_builtin": "True",
       "priority": "9",
       "font": {
-        "name": "Aptos Light",
+        "name": null,
         "size": "16.0pt",
         "bold": null,
         "italic": null,
@@ -453,7 +453,7 @@
       "is_builtin": "True",
       "priority": "9",
       "font": {
-        "name": "Aptos Light",
+        "name": null,
         "size": "16.0pt",
         "bold": null,
         "italic": null,
@@ -466,8 +466,8 @@
         "left_indent": null,
         "right_indent": null,
         "first_line_indent": null,
-        "space_before": "5.0pt",
-        "space_after": "5.0pt",
+        "space_before": null,
+        "space_after": null,
         "line_spacing": null,
         "line_spacing_rule": null,
         "keep_with_next": null,
@@ -483,7 +483,7 @@
       "is_builtin": "True",
       "priority": "9",
       "font": {
-        "name": "Aptos Light",
+        "name": null,
         "size": "14.0pt",
         "bold": null,
         "italic": null,
@@ -513,7 +513,7 @@
       "is_builtin": "True",
       "priority": "9",
       "font": {
-        "name": "Aptos Light",
+        "name": null,
         "size": "13.0pt",
         "bold": null,
         "italic": "True",
@@ -558,8 +558,8 @@
         "first_line_indent": null,
         "space_before": null,
         "space_after": null,
-        "line_spacing": "1.5",
-        "line_spacing_rule": "ONE_POINT_FIVE (1)",
+        "line_spacing": null,
+        "line_spacing_rule": null,
         "keep_with_next": null,
         "keep_together": null,
         "page_break_before": null,
@@ -777,7 +777,7 @@
       "is_builtin": "True",
       "priority": "10",
       "font": {
-        "name": "Aptos Light",
+        "name": null,
         "size": "28.0pt",
         "bold": null,
         "italic": null,
@@ -1340,8 +1340,8 @@
         "left_indent": null,
         "right_indent": null,
         "first_line_indent": null,
-        "space_before": "5.0pt",
-        "space_after": "5.0pt",
+        "space_before": null,
+        "space_after": null,
         "line_spacing": null,
         "line_spacing_rule": null,
         "keep_with_next": null,
@@ -1370,8 +1370,8 @@
         "left_indent": null,
         "right_indent": null,
         "first_line_indent": null,
-        "space_before": "5.0pt",
-        "space_after": "5.0pt",
+        "space_before": null,
+        "space_after": null,
         "line_spacing": null,
         "line_spacing_rule": null,
         "keep_with_next": null,
@@ -1434,22 +1434,20 @@
   },
   "font_usage": {
     "Aptos Light": {
-      "count": "152",
+      "count": "31",
       "sizes": [],
-      "colors": [
-        "000000"
-      ],
+      "colors": [],
       "styles": {
         "bold": "False",
-        "italic": "True",
+        "italic": "False",
         "underline": "False"
       }
     }
   },
   "paragraph_samples": [
     {
-      "index": "3",
-      "text": "\tThe Master",
+      "index": "5",
+      "text": "The Master",
       "style": "Title",
       "alignment": "Default",
       "indentation": {
@@ -1464,7 +1462,7 @@
       },
       "runs": [
         {
-          "text": "\tThe Master",
+          "text": "The Master",
           "font": null,
           "size": null,
           "bold": null,
@@ -1474,10 +1472,10 @@
       ]
     },
     {
-      "index": "4",
+      "index": "6",
       "text": "Dedicated to:",
       "style": "Normal",
-      "alignment": "CENTER (1)",
+      "alignment": "Default",
       "indentation": {
         "left": "0",
         "right": "0",
@@ -1486,24 +1484,24 @@
       "spacing": {
         "before": "0",
         "after": "0",
-        "line_spacing": "1.3"
+        "line_spacing": "Default"
       },
       "runs": [
         {
           "text": "Dedicated to:",
-          "font": "Aptos Light",
+          "font": null,
           "size": null,
           "bold": null,
           "italic": null,
-          "color": "000000"
+          "color": null
         }
       ]
     },
     {
-      "index": "6",
+      "index": "8",
       "text": " The PRESENCE that reverberates ",
       "style": "Normal",
-      "alignment": "CENTER (1)",
+      "alignment": "Default",
       "indentation": {
         "left": "0",
         "right": "0",
@@ -1512,7 +1510,7 @@
       "spacing": {
         "before": "0",
         "after": "0",
-        "line_spacing": "1.3"
+        "line_spacing": "Default"
       },
       "runs": [
         {
@@ -1542,10 +1540,10 @@
       ]
     },
     {
-      "index": "7",
+      "index": "9",
       "text": "in the core of my being, ",
       "style": "Normal",
-      "alignment": "CENTER (1)",
+      "alignment": "Default",
       "indentation": {
         "left": "0",
         "right": "0",
@@ -1554,7 +1552,7 @@
       "spacing": {
         "before": "0",
         "after": "0",
-        "line_spacing": "1.3"
+        "line_spacing": "Default"
       },
       "runs": [
         {
@@ -1568,7 +1566,7 @@
       ]
     },
     {
-      "index": "11",
+      "index": "13",
       "text": "Section 1 4",
       "style": "toc 1",
       "alignment": "Default",
@@ -1585,7 +1583,7 @@
       "runs": []
     },
     {
-      "index": "12",
+      "index": "14",
       "text": "1 The Final Thread 5",
       "style": "toc 1",
       "alignment": "Default",
@@ -1602,7 +1600,7 @@
       "runs": []
     },
     {
-      "index": "15",
+      "index": "17",
       "text": "Section 1",
       "style": "Heading 1",
       "alignment": "Default",
@@ -1618,15 +1616,7 @@
       },
       "runs": [
         {
-          "text": "Section ",
-          "font": null,
-          "size": null,
-          "bold": null,
-          "italic": null,
-          "color": null
-        },
-        {
-          "text": "1",
+          "text": "Section 1",
           "font": null,
           "size": null,
           "bold": null,
@@ -1636,7 +1626,7 @@
       ]
     },
     {
-      "index": "19",
+      "index": "21",
       "text": "1 The Final Thread",
       "style": "Heading 1",
       "alignment": "Default",
@@ -1670,10 +1660,10 @@
       ]
     },
     {
-      "index": "20",
+      "index": "22",
       "text": "\"When the heart and mind merge in silence, all that remains is the single thread of divine unity.\" – Daaji.",
       "style": "Heading 5",
-      "alignment": "CENTER (1)",
+      "alignment": "Default",
       "indentation": {
         "left": "0",
         "right": "0",
@@ -1696,9 +1686,9 @@
       ]
     },
     {
-      "index": "21",
-      "text": "There was once a grandmother who made the most beautiful blankets in the world. Her fingers danced with colourful threads, creating pictures that seem...",
-      "style": "Heading 5",
+      "index": "37",
+      "text": "The Thread Inside Everything",
+      "style": "Heading 3",
       "alignment": "Default",
       "indentation": {
         "left": "0",
@@ -1712,142 +1702,6 @@
       },
       "runs": [
         {
-          "text": "There was once a grandmother who made the most bea...",
-          "font": null,
-          "size": null,
-          "bold": null,
-          "italic": "False",
-          "color": null
-        },
-        {
-          "text": "colourful",
-          "font": null,
-          "size": null,
-          "bold": null,
-          "italic": "False",
-          "color": null
-        },
-        {
-          "text": " threads, creating pictures that seemed alive - fo...",
-          "font": null,
-          "size": null,
-          "bold": null,
-          "italic": "False",
-          "color": null
-        }
-      ]
-    },
-    {
-      "index": "22",
-      "text": "But when she turned seventy, her hands stopped working correctly. Her fingers became stiff and painful. She couldn't hold her needle anymore. She sat ...",
-      "style": "Normal (Web)",
-      "alignment": "Default",
-      "indentation": {
-        "left": "0",
-        "right": "0",
-        "first_line": "0"
-      },
-      "spacing": {
-        "before": "0",
-        "after": "0",
-        "line_spacing": "1.3"
-      },
-      "runs": [
-        {
-          "text": "But when she turned seventy, her hands stopped wor...",
-          "font": "Aptos Light",
-          "size": null,
-          "bold": null,
-          "italic": null,
-          "color": null
-        },
-        {
-          "text": "correct",
-          "font": "Aptos Light",
-          "size": null,
-          "bold": null,
-          "italic": null,
-          "color": null
-        },
-        {
-          "text": "ly. Her fingers became stiff and painful. She coul...",
-          "font": "Aptos Light",
-          "size": null,
-          "bold": null,
-          "italic": null,
-          "color": null
-        }
-      ]
-    },
-    {
-      "index": "23",
-      "text": "\"I am nothing without my weaving,\" she said.",
-      "style": "Normal (Web)",
-      "alignment": "Default",
-      "indentation": {
-        "left": "0",
-        "right": "0",
-        "first_line": "0"
-      },
-      "spacing": {
-        "before": "0",
-        "after": "0",
-        "line_spacing": "1.3"
-      },
-      "runs": [
-        {
-          "text": "\"I am nothing without my weaving,\" she said.",
-          "font": "Aptos Light",
-          "size": null,
-          "bold": null,
-          "italic": null,
-          "color": null
-        }
-      ]
-    },
-    {
-      "index": "24",
-      "text": "Her granddaughter, who was eight, brought her to meet a wise teacher - a Master. The grandmother showed him her sadness.",
-      "style": "Normal (Web)",
-      "alignment": "Default",
-      "indentation": {
-        "left": "0",
-        "right": "0",
-        "first_line": "0"
-      },
-      "spacing": {
-        "before": "0",
-        "after": "0",
-        "line_spacing": "1.3"
-      },
-      "runs": [
-        {
-          "text": "Her granddaughter, who was eight, brought her to m...",
-          "font": "Aptos Light",
-          "size": null,
-          "bold": null,
-          "italic": null,
-          "color": null
-        }
-      ]
-    },
-    {
-      "index": "35",
-      "text": "The Thread Inside Everything",
-      "style": "Heading 3",
-      "alignment": "Default",
-      "indentation": {
-        "left": "0",
-        "right": "0",
-        "first_line": "0"
-      },
-      "spacing": {
-        "before": "0",
-        "after": "0",
-        "line_spacing": "1.3"
-      },
-      "runs": [
-        {
           "text": "The Thread Inside Everything",
           "font": null,
           "size": null,
@@ -1858,7 +1712,65 @@
       ]
     },
     {
-      "index": "39",
+      "index": "40",
+      "text": "A scientist who studied tiny particles explained it like this: \"Everything in the universe is connected, like one giant spider web. Touch one part, an...",
+      "style": "Normal (Web)",
+      "alignment": "Default",
+      "indentation": {
+        "left": "0",
+        "right": "0",
+        "first_line": "0"
+      },
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "line_spacing": "Default"
+      },
+      "runs": [
+        {
+          "text": "A scientist who studied tiny particles explained i...",
+          "font": null,
+          "size": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "\"",
+          "font": "Aptos Light",
+          "size": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "E",
+          "font": "Aptos Light",
+          "size": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "verything in the universe is connected, like one g...",
+          "font": "Aptos Light",
+          "size": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        },
+        {
+          "text": "\"",
+          "font": "Aptos Light",
+          "size": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": "41",
       "text": "The Magic Loom of Quiet",
       "style": "Heading 3",
       "alignment": "Default",
@@ -1870,7 +1782,7 @@
       "spacing": {
         "before": "0",
         "after": "0",
-        "line_spacing": "1.3"
+        "line_spacing": "Default"
       },
       "runs": [
         {
@@ -1884,7 +1796,7 @@
       ]
     },
     {
-      "index": "43",
+      "index": "45",
       "text": "The Pattern That Makes Itself",
       "style": "Heading 3",
       "alignment": "Default",
@@ -1896,7 +1808,7 @@
       "spacing": {
         "before": "0",
         "after": "0",
-        "line_spacing": "1.3"
+        "line_spacing": "Default"
       },
       "runs": [
         {
@@ -1910,9 +1822,9 @@
       ]
     },
     {
-      "index": "68",
-      "text": "The Master's message is straightforward:",
-      "style": "Heading 4",
+      "index": "80",
+      "text": "Close your eyes for a moment. Can you feel it? The thread that connects you to everything? It's been there all along, waiting for you to notice. And n...",
+      "style": "Normal (Web)",
       "alignment": "Default",
       "indentation": {
         "left": "0",
@@ -1922,27 +1834,63 @@
       "spacing": {
         "before": "0",
         "after": "0",
-        "line_spacing": "1.3"
+        "line_spacing": "Default"
       },
       "runs": [
         {
-          "text": "The Master's message is ",
-          "font": null,
+          "text": "Close your eyes for a moment. Can you feel it? The...",
+          "font": "Aptos Light",
           "size": null,
           "bold": null,
           "italic": null,
           "color": null
-        },
+        }
+      ]
+    },
+    {
+      "index": "83",
+      "text": "1. The Tuning Fork of the Soul",
+      "style": "Normal (Web)",
+      "alignment": "Default",
+      "indentation": {
+        "left": "0",
+        "right": "0",
+        "first_line": "0"
+      },
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "line_spacing": "Default"
+      },
+      "runs": [
         {
-          "text": "straightforward",
-          "font": null,
+          "text": "1. The Tuning Fork of the Soul",
+          "font": "Aptos Light",
           "size": null,
-          "bold": null,
+          "bold": "False",
           "italic": null,
           "color": null
-        },
+        }
+      ]
+    },
+    {
+      "index": "84",
+      "text": "Vibrates at frequencies that awaken dormant harmonics in seekers",
+      "style": "List Paragraph",
+      "alignment": "Default",
+      "indentation": {
+        "left": "0",
+        "right": "0",
+        "first_line": "0"
+      },
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "line_spacing": "Default"
+      },
+      "runs": [
         {
-          "text": ":",
+          "text": "Vibrates at frequencies that awaken dormant harmon...",
           "font": null,
           "size": null,
           "bold": null,
@@ -1953,8 +1901,8 @@
     },
     {
       "index": "85",
-      "text": "Primary Archetypal Roles",
-      "style": "Heading 2",
+      "text": "Activates recognition rather than teaching something foreign",
+      "style": "List Paragraph",
       "alignment": "Default",
       "indentation": {
         "left": "0",
@@ -1964,11 +1912,37 @@
       "spacing": {
         "before": "0",
         "after": "0",
-        "line_spacing": "1.3"
+        "line_spacing": "Default"
       },
       "runs": [
         {
-          "text": "Primary Archetypal Roles",
+          "text": "Activates recognition rather than teaching somethi...",
+          "font": null,
+          "size": null,
+          "bold": null,
+          "italic": null,
+          "color": null
+        }
+      ]
+    },
+    {
+      "index": "87",
+      "text": "Connects human to divine, form to formless, time to eternity",
+      "style": "List Paragraph",
+      "alignment": "Default",
+      "indentation": {
+        "left": "0",
+        "right": "0",
+        "first_line": "0"
+      },
+      "spacing": {
+        "before": "0",
+        "after": "0",
+        "line_spacing": "Default"
+      },
+      "runs": [
+        {
+          "text": "Connects human to divine, form to formless, time t...",
           "font": null,
           "size": null,
           "bold": null,

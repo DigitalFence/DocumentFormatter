@@ -540,3 +540,4 @@ When contributing AI enhancements:
 ---
 
 This document will be updated as the AI enhancement features are implemented and refined.
+- Never hard code the font in the python code.

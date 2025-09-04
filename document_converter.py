@@ -15,7 +15,7 @@ import warnings
 try:
     from docx import Document
     from docx.shared import Pt, RGBColor, Inches
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
     from docx.enum.style import WD_STYLE_TYPE
     from docx.text.paragraph import Paragraph
     from docx.text.run import Run
@@ -590,28 +590,118 @@ class DocumentConverter:
     """Converts various document formats to Word with reference styling."""
     
     def __init__(self, reference_doc_path: str, config_path: Optional[str] = None):
-        self.style_extractor = StyleExtractor(reference_doc_path)
-        self.output_doc = Document()
+        # Store reference path for template use
+        self.reference_doc_path = reference_doc_path
+        resolved_path = resolve_path(reference_doc_path)
         
-        # Load configuration
+        # Check if we should use formatter config
+        # For now, always load config for behavioral rules (page breaks, chapter detection)
+        # but only apply style overrides if USE_FORMATTER_CONFIG=1
+        self.use_config = os.environ.get('USE_FORMATTER_CONFIG', '0') == '1'
+        self.always_use_behavioral_config = True  # Always use config for page breaks, chapter detection
+        
+        # Use reference document as template to preserve all styles
+        print(f"Using template approach with reference: {resolved_path}")
+        self.output_doc = Document(resolved_path)
+        
+        # Clear all content from template while preserving styles
+        self._clear_template_content()
+        
+        # Always load config for behavioral rules
         if FormatterConfig:
             self.config = FormatterConfig(config_path)
         else:
             self.config = None
+        
+        # Only extract styles if config is enabled (for style overrides)
+        if self.use_config and self.config:
+            self.style_extractor = StyleExtractor(reference_doc_path)
+        else:
+            self.style_extractor = None
         
         # Track chapter state for separator placement
         self.current_chapter_started = False
         self.paragraphs_since_chapter = 0
         self.current_chapter_elements = []
         
+        # Track whether we've processed the first H1 as title
+        self.first_h1_as_title = False
+        
         # Track hierarchical list context
         self.in_hierarchical_list = False
         self.current_list_heading_level = None
+        
+        # Track special sections for page breaks
+        self.special_sections = {
+            'title': False,
+            'dedication': False,
+            'contents': False,
+            'preface': False,
+            'foreword': False
+        }
+    
+    def _clear_template_content(self):
+        """Clear all content from the template document while preserving styles."""
+        # Clear all paragraphs from the document
+        for paragraph in list(self.output_doc.paragraphs):
+            p_element = paragraph._element
+            p_element.getparent().remove(p_element)
+        
+        # Clear all tables if any
+        for table in list(self.output_doc.tables):
+            t_element = table._element
+            t_element.getparent().remove(t_element)
+        
+        print("Template content cleared, styles preserved")
+    
+    def _is_special_section(self, text: str) -> Optional[str]:
+        """Check if text represents a special section that needs its own page."""
+        text_lower = text.lower().strip()
+        
+        # No automatic title detection - first H1 is handled separately
+        
+        if 'dedication' in text_lower or 'dedicated to' in text_lower or 'in memory of' in text_lower:
+            return 'dedication'
+        
+        if text_lower in ['contents', 'table of contents', 'toc'] or 'table of contents' in text_lower:
+            return 'contents'
+        
+        if text_lower == 'preface' or text_lower.startswith('preface'):
+            return 'preface'
+        
+        if text_lower == 'foreword' or text_lower.startswith('foreword'):
+            return 'foreword'
+        
+        return None
+    
+    def _handle_special_section_page_break(self, section_type: str):
+        """Mark special section as processed. Page breaks will be added before next major section."""
+        if section_type and not self.special_sections.get(section_type, False):
+            self.special_sections[section_type] = True
+            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                print(f"DEBUG: Processing special section: {section_type} (page break deferred)")
+            else:
+                print(f"Processing special section: {section_type}")
+            
+            # Don't add immediate page breaks after dedication or contents
+            # They should flow together until we hit the next major section
+            # Only add immediate page break after title
+            if self.config and len(self.output_doc.paragraphs) > 0:
+                should_add_pagebreak = False
+                if section_type == 'title' and self.config.should_add_page_break_after_title():
+                    should_add_pagebreak = True
+                
+                if should_add_pagebreak:
+                    self.output_doc.add_page_break()
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: Added immediate page break AFTER {section_type} section")
+                    else:
+                        print(f"Added page break after {section_type}")
     
     def _handle_chapter_end(self):
         """Handle formatting at the end of a chapter."""
         # Check if we need to apply closing content formatting
-        if self.current_chapter_elements:
+        if self.current_chapter_elements and self.config:
             closing_settings = self.config.get_chapter_closing_settings()
             if closing_settings.get('enabled'):
                 # Look for closing content patterns in the last few elements
@@ -624,8 +714,11 @@ class DocumentConverter:
                             self._apply_subtle_emphasis(para, closing_settings)
         
         # Add chapter separator
-        separator_settings = self.config.get_chapter_separator()
-        if separator_settings.get('enabled') and separator_settings.get('position') == 'after':
+        if self.config:
+            separator_settings = self.config.get_chapter_separator()
+        else:
+            separator_settings = None
+        if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
             self._add_chapter_separator(separator_settings)
     
     def _is_chapter_opening_content(self, text: str, position: int) -> bool:
@@ -662,10 +755,55 @@ class DocumentConverter:
                 
         return False
     
+    def _get_reference_font_for_style(self, style_name: str) -> Optional[Dict]:
+        """Extract font information for a given style from the reference document."""
+        if not self.style_extractor or not hasattr(self.style_extractor, 'styles'):
+            return None
+        
+        # Look for paragraphs using this style in the extracted styles
+        paragraphs = self.style_extractor.styles.get('paragraphs', [])
+        for para in paragraphs:
+            if para.get('style_name') == style_name:
+                # Look for the actual font used in runs
+                if 'runs' in para:
+                    for run in para['runs']:
+                        font = run.get('font')
+                        if font and font != 'null' and font != 'None':
+                            return {
+                                'name': font,
+                                'size': run.get('size'),
+                                'bold': run.get('bold'),
+                                'italic': run.get('italic'),
+                                'color': run.get('color')
+                            }
+                            
+        # If no runs found, check if style has font definition
+        headings = self.style_extractor.styles.get('headings', {})
+        if style_name in headings:
+            style_info = headings[style_name]
+            font_info = style_info.get('font', {})
+            if font_info and font_info.get('name'):
+                return {
+                    'name': font_info.get('name'),
+                    'size': font_info.get('size'),
+                    'bold': font_info.get('bold'),
+                    'italic': font_info.get('italic'),
+                    'color': font_info.get('color')
+                }
+        
+        return None
+    
     def _apply_subtle_emphasis(self, paragraph, settings: Dict):
         """Apply subtle emphasis formatting to a paragraph."""
+        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+            print(f"DEBUG: Applying subtle emphasis with settings: {settings}")
+            print(f"DEBUG: Paragraph has {len(paragraph.runs)} runs")
+        
         # Apply to all runs in the paragraph
-        for run in paragraph.runs:
+        for i, run in enumerate(paragraph.runs):
+            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                print(f"DEBUG: Run {i}: '{run.text[:30]}...', applying italic={settings.get('italic')}")
+            
             if settings.get('italic'):
                 run.italic = True
                 
@@ -766,46 +904,30 @@ class DocumentConverter:
         for marker in page_break_markers:
             content = content.replace(marker, '<!--PAGEBREAK-->')
         
-        # Handle #Heading0 for title detection
-        # Store titles separately before markdown processing
-        import re
-        title_lines = []
-        title_pattern = r'^#Heading0\s+(.+)$'
-        
-        # Find and store all title lines
-        for match in re.finditer(title_pattern, content, flags=re.MULTILINE):
-            title_lines.append((match.start(), match.end(), match.group(1)))
-        
-        # Replace #Heading0 lines with placeholders (process in reverse to maintain positions)
-        for i, (start, end, title_text) in reversed(list(enumerate(title_lines))):
-            placeholder = f"TITLE_PLACEHOLDER_{i}"
-            content = content[:start] + placeholder + content[end:]
+        # No special title processing needed - first H1 will be treated as title
         
         # Convert markdown to HTML
         extensions = ['tables', 'fenced_code', 'nl2br']
         html = markdown.markdown(content, extensions=extensions)
+        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1' and os.environ.get('SHOW_HTML', '0') == '1':
+            print(f"DEBUG: Generated HTML from markdown:")
+            print(html[:800] + "..." if len(html) > 800 else html)
         
         # Parse HTML
         soup = BeautifulSoup(html, 'html.parser')
         
-        # Replace title placeholders with h0 elements
-        for i, (_, _, title_text) in enumerate(title_lines):
-            placeholder = f"TITLE_PLACEHOLDER_{i}"
-            for p in soup.find_all(string=re.compile(placeholder)):
-                # Create an h0 element
-                h0 = soup.new_tag('h0')
-                h0.string = title_text
-                # Replace the parent paragraph with h0
-                if p.parent.name == 'p':
-                    p.parent.replace_with(h0)
-                else:
-                    p.replace_with(h0)
+        # No title placeholder processing needed
         
         # Track processed elements to avoid duplicates
         processed_elements = set()
         
         # Get all elements
         all_elements = soup.find_all(['h0', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'blockquote', 'ul', 'ol', 'table', 'pre'])
+        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+            print(f"DEBUG: Found {len(all_elements)} elements to process:")
+            for i, elem in enumerate(all_elements):
+                content = elem.get_text().strip()[:50]
+                print(f"  {i}: <{elem.name}> '{content}...'")
         
         # Track when we're at the end of a chapter for separator placement
         self.current_chapter_started = False
@@ -817,10 +939,14 @@ class DocumentConverter:
             if idx + 1 < len(all_elements):
                 next_elem = all_elements[idx + 1]
                 if next_elem.name in ['h0', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                    level = 0 if next_elem.name == 'h0' else int(next_elem.name[1])
-                    heading_text = next_elem.get_text().strip()
-                    if self.config and (level == 1 or self.config.is_chapter_keyword(heading_text)):
+                    # h0 after the first one is a chapter
+                    if next_elem.name == 'h0' and self.special_sections['title']:
                         next_is_chapter = True
+                    else:
+                        level = 0 if next_elem.name == 'h0' else int(next_elem.name[1])
+                        heading_text = next_elem.get_text().strip()
+                        if self.config and (level == 1 or self.config.is_chapter_keyword(heading_text)):
+                            next_is_chapter = True
             
             # Add separator at end of chapter if configured for "after" position
             if self.current_chapter_started and next_is_chapter and self.config:
@@ -832,22 +958,30 @@ class DocumentConverter:
             if self.current_chapter_started:
                 self.paragraphs_since_chapter += 1
             
-        # Handle separator at the very end if we're in a chapter
+        # Always handle separator at the very end if we're in a chapter
         if self.current_chapter_started and self.config:
-            self._handle_chapter_end()
+            # Force add separator at end of document if we're still in a chapter
+            separator_settings = self.config.get_chapter_separator()
+            if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
+                self._add_chapter_separator(separator_settings)
+                print("Added chapter separator at end of document")
     
     def _process_html_element(self, element, processed_elements):
         """Process individual HTML elements."""
         # Skip if already processed (to avoid duplicates in blockquotes)
         if id(element) in processed_elements:
             return
-        if element.name in ['h0', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-            # Handle h0 as Title
-            if element.name == 'h0':
+        if element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+            level = int(element.name[1])
+            
+            # Handle first H1 as Title
+            if element.name == 'h1' and not self.first_h1_as_title:
                 use_title_style = True
-                level = 0
+                level = 0  # Treat as title level
+                self.first_h1_as_title = True
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: First H1 converted to document title: '{element.get_text().strip()}'")
             else:
-                level = int(element.name[1])
                 use_title_style = False
             
             heading_text = element.get_text().strip()
@@ -855,8 +989,8 @@ class DocumentConverter:
             # Determine the Word heading level
             word_heading_level = level
             
-            # Use configuration if available
-            if self.config:
+            # Use configuration if available for behavioral rules
+            if self.config and self.always_use_behavioral_config:
                 # Check if this is a section (use Heading 1)
                 if self.config.is_section_keyword(heading_text):
                     word_heading_level = 1
@@ -867,14 +1001,28 @@ class DocumentConverter:
                 elif level == 1 or self.config.is_chapter_keyword(heading_text):
                     word_heading_level = 2
                     
-                    # Add page break before chapter if configured
-                    if self.config.should_apply_page_break("chapter") and len(self.output_doc.paragraphs) > 0:
+                    # Debug logging
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: Chapter detected: '{heading_text}' (level={level}, keyword_match={self.config.is_chapter_keyword(heading_text)})")
+                    
+                    # Simple rule: Always add page break before chapters (H1 headings)
+                    if len(self.output_doc.paragraphs) > 0:
                         self.output_doc.add_page_break()
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Added page break before chapter: '{heading_text}'")
+                        
+                        # Clear any special section flags since we're starting a new major section
+                        if self.special_sections.get('dedication'):
+                            self.special_sections['dedication'] = False
+                        if self.special_sections.get('contents'):
+                            self.special_sections['contents'] = False
                     
                     # Add separator before chapter if configured for "before" position
                     separator_settings = self.config.get_chapter_separator()
                     if separator_settings.get('enabled') and separator_settings.get('position') == 'before' and len(self.output_doc.paragraphs) > 0:
                         self._add_chapter_separator(separator_settings)
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Added chapter separator before: '{heading_text}'")
                     
                     # Mark that we're in a chapter for end-of-chapter separator
                     self.current_chapter_started = True
@@ -898,16 +1046,38 @@ class DocumentConverter:
                 elif level >= 2:
                     word_heading_level = min(level + 1, 6)
             
-            # Add the heading or title
+            # Check if this is a special section
+            special_section = self._is_special_section(heading_text)
+            
+            # If this is the title (first H1), mark it as title special section
             if use_title_style:
+                special_section = 'title'
+            
+            # Add page break BEFORE special sections (except title)
+            # Contents should have its own page break before it
+            if special_section and special_section != 'title' and len(self.output_doc.paragraphs) > 0:
+                self.output_doc.add_page_break()
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: Added page break BEFORE {special_section} section")
+                else:
+                    print(f"Added page break before {special_section}")
+            
+            # Add the heading or title
+            if use_title_style or special_section == 'title':
                 # Use Title style instead of heading
                 heading = self.output_doc.add_paragraph(heading_text)
                 heading.style = 'Title'
+                # Mark as special section if detected
+                if special_section:
+                    self._handle_special_section_page_break(special_section)
             else:
                 heading = self.output_doc.add_heading(heading_text, level=word_heading_level)
+                # Check for other special sections
+                if special_section:
+                    self._handle_special_section_page_break(special_section)
             
-            # Apply heading overrides from configuration if available
-            if self.config:
+            # Apply heading overrides from configuration if style overrides are enabled
+            if self.config and self.use_config and self.style_extractor:
                 override = self.config.get_heading_override(word_heading_level)
                 if override:
                     # Apply alignment
@@ -1022,6 +1192,10 @@ class DocumentConverter:
                     blockquote_text = ' '.join([p.get_text().strip() for p in paragraphs])
                     if self._is_chapter_opening_content(blockquote_text, self.paragraphs_since_chapter):
                         is_opening_quote = True
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Chapter opening quote detected in blockquote: '{blockquote_text[:50]}...'")
+                    elif os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: Blockquote not detected as opening quote: '{blockquote_text[:50]}...', paragraphs_since_chapter={self.paragraphs_since_chapter}")
                 
                 # Create a single paragraph for the entire blockquote
                 para = self.output_doc.add_paragraph()
@@ -1033,11 +1207,13 @@ class DocumentConverter:
                 # Track if we're processing the transliteration (first non-source paragraph)
                 transliteration_processed = False
                 
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: Blockquote has {len(paragraphs)} paragraphs:")
+                    for j, p in enumerate(paragraphs):
+                        print(f"  Paragraph {j}: '{p.get_text().strip()}'")
+                
                 for i, p_elem in enumerate(paragraphs):
                     text = p_elem.get_text().strip()
-                    # Remove em dash from citations if configured
-                    if remove_em_dashes and text.startswith('—'):
-                        text = text[1:].strip()
                     
                     if text:
                         # Add line break between paragraphs (except for the first)
@@ -1045,13 +1221,62 @@ class DocumentConverter:
                             para.add_run('\n')
                         
                         # Check if this looks like a source citation (last paragraph, often shorter)
-                        is_citation = i == len(paragraphs) - 1 and len(text) < 100
+                        # Look for patterns like author names, book titles, or short attributions
+                        is_citation = False
+                        if i == len(paragraphs) - 1:  # Last paragraph
+                            # For multi-paragraph blockquotes, check if last paragraph is citation
+                            if len(paragraphs) > 1:
+                                if (len(text) < 100 and 
+                                    (any(word[0].isupper() for word in text.split()) or 
+                                     'Chapter' in text or 'Verse' in text or
+                                     text.startswith('-') or text.startswith('—'))):
+                                    is_citation = True
+                            else:
+                                # Single paragraph blockquote - handle quote and source separately
+                                # Split by lines and check if the last line looks like a source
+                                lines = text.split('\n')
+                                if len(lines) > 1:
+                                    last_line = lines[-1].strip()
+                                    if (last_line.startswith('-') or last_line.startswith('—')) and len(last_line) < 100:
+                                        # Process as separate quote and citation
+                                        quote_lines = lines[:-1]
+                                        quote_text = '\n'.join(quote_lines).strip()
+                                        
+                                        # Add the quote part (not italic by default)
+                                        if is_opening_quote:
+                                            run = para.add_run(quote_text)
+                                            run.italic = True  # Quote part should be italic for opening quotes
+                                        else:
+                                            para.add_run(quote_text)
+                                        
+                                        # Add line break
+                                        para.add_run('\n')
+                                        
+                                        # Add the citation part
+                                        citation_text = last_line
+                                        if not citation_text.startswith('—'):
+                                            citation_text = '— ' + citation_text.lstrip('- ')
+                                        run = para.add_run(citation_text)
+                                        run.italic = True
+                                        
+                                        # Skip the normal processing for this paragraph
+                                        continue
                         
                         if is_citation:
-                            # Source citation - make it italic and smaller
+                            # Source citation - ensure it starts with em dash if it doesn't already
+                            if not text.startswith('—') and not text.startswith('-'):
+                                text = '— ' + text
+                            elif text.startswith('-'):
+                                # Replace hyphen with em dash
+                                text = '—' + text[1:]
+                            
+                            # Apply reference style formatting for citations
                             run = para.add_run(text)
                             run.italic = True
-                            run.font.size = Pt(10)
+                            # Use reference document's font if available
+                            if hasattr(para, 'style') and para.style:
+                                # Citation inherits from the paragraph style
+                                pass
                         else:
                             # Check if the paragraph contains em/i tags
                             if p_elem.find('em') or p_elem.find('i'):
@@ -1061,6 +1286,9 @@ class DocumentConverter:
                                         if child.name in ['em', 'i']:
                                             run = para.add_run(child.get_text())
                                             run.italic = True
+                                            # Apply reference style for italic text in quotes
+                                            if is_opening_quote:
+                                                run.font.size = Pt(10)  # Smaller size for verses
                                         else:
                                             para.add_run(child.get_text())
                                     else:
@@ -1069,13 +1297,21 @@ class DocumentConverter:
                                         if text_content:
                                             para.add_run(text_content)
                             else:
-                                # Plain text paragraph
-                                para.add_run(text)
+                                # Plain text paragraph - for opening quotes, apply italic to entire text
+                                if is_opening_quote and i == 0:
+                                    # First paragraph of opening quote (usually the verse/quote itself)
+                                    run = para.add_run(text)
+                                    run.italic = True
+                                else:
+                                    para.add_run(text)
                 
                 # Apply opening quote formatting if needed
                 if is_opening_quote:
-                    opening_settings = self.config.get_chapter_opening_settings()
-                    self._apply_subtle_emphasis(para, opening_settings)
+                    # Apply Emphasis character style to all runs in the paragraph
+                    for run in para.runs:
+                        run.style = 'Emphasis'
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: Applied Emphasis character style to chapter opening quote blockquote")
                 
                 # Track this element for chapter end detection
                 if self.current_chapter_started:
@@ -1087,6 +1323,8 @@ class DocumentConverter:
             
         elif element.name == 'p':
             text = element.get_text().strip()
+            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                print(f"DEBUG: Processing paragraph element: '{text[:50]}...'")
             
             # Check for page break placeholder
             if '<!--PAGEBREAK-->' in str(element):
@@ -1095,19 +1333,40 @@ class DocumentConverter:
                 # Remove the placeholder from the text
                 text = text.replace('<!--PAGEBREAK-->', '')
             
+            # Check if this paragraph is a special section (like "Dedicated to")
+            special_section = self._is_special_section(text)
+            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                print(f"DEBUG: Checking paragraph for special section: '{text[:30]}...' -> {special_section}")
+            if special_section and special_section == 'dedication':
+                # Handle dedication as a special paragraph
+                para = self.output_doc.add_paragraph()
+                self._process_inline_elements(element, para)
+                # Add page break after dedication paragraph
+                self._handle_special_section_page_break(special_section)
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: Processed dedication paragraph (page break deferred until next major section)")
+                return
+            
             # Check if this is a chapter opening quote
             is_opening_quote = False
             if self.config and self.current_chapter_started and self.paragraphs_since_chapter <= 3:
                 if self._is_chapter_opening_content(text, self.paragraphs_since_chapter):
                     is_opening_quote = True
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: Chapter opening quote detected in paragraph: '{text[:50]}...'")
+                elif os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: Paragraph not detected as opening quote: '{text[:50]}...', paragraphs_since_chapter={self.paragraphs_since_chapter}")
             
             para = self.output_doc.add_paragraph()
             self._process_inline_elements(element, para)
             
             # Apply opening quote formatting if needed
             if is_opening_quote:
-                opening_settings = self.config.get_chapter_opening_settings()
-                self._apply_subtle_emphasis(para, opening_settings)
+                # Apply Emphasis character style to all runs in the paragraph
+                for run in para.runs:
+                    run.style = 'Emphasis'
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: Applied Emphasis character style to chapter opening quote paragraph")
             
             # Check if this is part of a hierarchical list structure
             if self.config and self.in_hierarchical_list:
@@ -1118,8 +1377,47 @@ class DocumentConverter:
                     numbered_pattern = hl_settings.get('detection_rules', {}).get('numbered_pattern', r'^\d+\.\s+[A-Z]')
                     if re.match(numbered_pattern, text):
                         # Apply Normal (Web) style if available
-                        if 'Normal (Web)' in [style.name for style in self.output_doc.styles]:
-                            para.style = 'Normal (Web)'
+                        style_names = [style.name for style in self.output_doc.styles]
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Applying hierarchical list style to: '{text[:30]}...'")
+                            print(f"DEBUG: Available styles: {[s for s in style_names if 'Normal' in s or 'Web' in s]}")
+                        
+                        target_style = hl_settings.get('numbered_item_style', 'Normal (Web)')
+                        if target_style in style_names:
+                            # Preserve existing font formatting before applying style
+                            existing_fonts = []
+                            for run in para.runs:
+                                existing_fonts.append({
+                                    'name': run.font.name,
+                                    'size': run.font.size,
+                                    'bold': run.font.bold,
+                                    'italic': run.font.italic,
+                                    'color': run.font.color.rgb if run.font.color and run.font.color.rgb else None
+                                })
+                            
+                            # Apply the style
+                            para.style = target_style
+                            
+                            # Restore font formatting that might have been overridden by style
+                            for i, run in enumerate(para.runs):
+                                if i < len(existing_fonts):
+                                    font_info = existing_fonts[i]
+                                    if font_info['name']:
+                                        run.font.name = font_info['name']
+                                    if font_info['size']:
+                                        run.font.size = font_info['size']
+                                    if font_info['bold'] is not None:
+                                        run.font.bold = font_info['bold']
+                                    if font_info['italic'] is not None:
+                                        run.font.italic = font_info['italic']
+                                    if font_info['color']:
+                                        run.font.color.rgb = font_info['color']
+                            
+                            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                                print(f"DEBUG: Applied '{target_style}' style while preserving existing fonts")
+                        else:
+                            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                                print(f"DEBUG: Style '{target_style}' not found, using default")
                     else:
                         # Check if we've left the hierarchical list section
                         # (e.g., if we encounter a regular paragraph that doesn't match the pattern)
@@ -1145,10 +1443,27 @@ class DocumentConverter:
             
             for li in element.find_all('li', recursive=False):
                 para = self.output_doc.add_paragraph(li.get_text().strip())
-                if use_list_paragraph_style and 'List Paragraph' in [style.name for style in self.output_doc.styles]:
-                    para.style = 'List Paragraph'
-                else:
-                    para.style = 'List Bullet' if element.name == 'ul' else 'List Number'
+                # Try to use list styles if available
+                try:
+                    if use_list_paragraph_style and 'List Paragraph' in [style.name for style in self.output_doc.styles]:
+                        para.style = 'List Paragraph'
+                    elif element.name == 'ul' and 'List Bullet' in [style.name for style in self.output_doc.styles]:
+                        para.style = 'List Bullet'
+                    elif element.name == 'ol' and 'List Number' in [style.name for style in self.output_doc.styles]:
+                        para.style = 'List Number'
+                    else:
+                        # Fallback to normal style with manual formatting
+                        para.style = 'Normal'
+                        if element.name == 'ul':
+                            para.text = '• ' + para.text
+                        else:
+                            # Get the list item number
+                            list_items = element.find_all('li', recursive=False)
+                            item_index = list_items.index(li) + 1
+                            para.text = f'{item_index}. ' + para.text
+                except:
+                    # If any style error, use normal style
+                    para.style = 'Normal'
                 
         elif element.name == 'table':
             self._process_table(element)
@@ -1338,11 +1653,16 @@ class DocumentConverter:
             # Process lists
             elif para.style and para.style.name and ('List' in para.style.name or 'Bullet' in para.style.name):
                 new_para = self.output_doc.add_paragraph(para.text)
-                # Apply list style
-                if 'Bullet' in para.style.name:
-                    new_para.style = 'List Bullet'
-                else:
-                    new_para.style = 'List Number'
+                # Apply list style if available
+                try:
+                    if 'Bullet' in para.style.name and 'List Bullet' in [style.name for style in self.output_doc.styles]:
+                        new_para.style = 'List Bullet'
+                    elif 'List Number' in [style.name for style in self.output_doc.styles]:
+                        new_para.style = 'List Number'
+                    else:
+                        new_para.style = 'Normal'
+                except:
+                    new_para.style = 'Normal'
                 # Copy run formatting
                 if para.runs and new_para.runs:
                     for i, run in enumerate(para.runs):
@@ -1425,6 +1745,10 @@ class DocumentConverter:
     
     def _apply_reference_styles(self):
         """Apply styles from reference document to output document."""
+        # Only apply if we're using config (otherwise template styles are already in place)
+        if not self.use_config or not self.style_extractor:
+            return
+        
         styles = self.style_extractor.styles
         
         # Apply document-level styles
