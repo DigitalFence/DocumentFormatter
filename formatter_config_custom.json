@@ -1,0 +1,33 @@
+{
+  "heading_overrides": {
+    "comment": "Custom overrides for testing",
+    "heading_3": {
+      "alignment": "left",
+      "italic": true,
+      "bold": true
+    },
+    "heading_4": {
+      "alignment": "right",
+      "italic": false,
+      "font_size": 14
+    },
+    "heading_5": {
+      "alignment": "center",
+      "italic": true
+    }
+  },
+  "heading_detection": {
+    "section_keywords": ["section", "part", "division"],
+    "chapter_keywords": ["chapter", "ch."],
+    "always_use_heading_2_for_chapters": true
+  },
+  "page_breaks": {
+    "before_sections": true,
+    "before_chapters": false
+  },
+  "blockquote_formatting": {
+    "remove_em_dashes": false,
+    "single_line_spacing": true,
+    "center_align": false
+  }
+}

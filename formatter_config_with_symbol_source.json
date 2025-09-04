@@ -1,0 +1,37 @@
+{
+  "heading_overrides": {
+    "comment": "Override heading styles. Set to null to use template defaults",
+    "heading_3": {
+      "alignment": "center",
+      "italic": false
+    },
+    "heading_4": {
+      "alignment": "left",
+      "italic": true
+    }
+  },
+  "heading_detection": {
+    "section_keywords": ["section", "part"],
+    "chapter_keywords": ["chapter"],
+    "always_use_heading_2_for_chapters": true
+  },
+  "page_breaks": {
+    "before_sections": false,
+    "before_chapters": true
+  },
+  "blockquote_formatting": {
+    "remove_em_dashes": true,
+    "single_line_spacing": true,
+    "center_align": true
+  },
+  "chapter_separator": {
+    "enabled": true,
+    "symbol": "❦",
+    "symbol_source": "/Users/KDP/Documents/WordTemplates/Symbols.docx",
+    "comment": "Extract first symbol from specified Word doc",
+    "position": "before",
+    "spacing_before": 12,
+    "spacing_after": 12,
+    "font_size": 14
+  }
+}

@@ -1,0 +1,12 @@
+This is a test file for the Finder Quick Action.
+
+Chapter 1: Introduction
+
+This document will test the AI-enhanced formatting system. It contains Sanskrit text like Vāg vai brahma and should be processed correctly.
+
+Key Features:
+- AI text analysis  
+- Professional formatting
+- Multi-language support
+
+Let's see how well it works!

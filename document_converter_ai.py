@@ -14,12 +14,21 @@ from typing import Optional, Tuple
 from document_converter import DocumentConverter
 from striprtf.striprtf import rtf_to_text
 
+try:
+    from alias_resolver import resolve_path
+except ImportError:
+    # If alias_resolver is not available, create a dummy function
+    def resolve_path(path):
+        return str(path)
+
 class AIDocumentConverter:
     """Converts documents with AI-powered text analysis."""
     
-    def __init__(self, reference_path: str):
-        self.reference_path = reference_path
-        self.converter = DocumentConverter(reference_path)
+    def __init__(self, reference_path: str, config_path: Optional[str] = None):
+        # Resolve any aliases or symlinks
+        self.reference_path = resolve_path(reference_path)
+        self.converter = DocumentConverter(self.reference_path, config_path=config_path)
+        self.config_path = config_path
         self.debug = os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1'
         # Configuration options
         self.save_markdown = os.environ.get('SAVE_MARKDOWN', '1') == '1'  # Default: save markdown
@@ -33,12 +42,20 @@ class AIDocumentConverter:
         return f"""Convert the following plain text to well-structured markdown format.
 
 Instructions:
-1. Identify and mark headings based on context and formatting cues
-2. Detect lists (both bulleted and numbered) and format appropriately  
+1. TITLE DETECTION: The first substantial line of text (not a date or other metadata) should be marked as #Heading0
+   - This is typically the document title/name
+   - Use exactly "#Heading0 " followed by the title text
+   - Example: #Heading0 The Complete Guide to Spiritual Wisdom
+2. Identify and mark other headings based on context and formatting cues:
+   - Main sections or parts should use # (H1) - look for "Section", "Part", or similar major divisions
+   - Chapters should use # (H1) - look for "Chapter" followed by numbers or titles
+   - Sub-sections within chapters should use ## (H2)
+   - Sub-sub-sections should use ### (H3), and so on
+3. Detect lists (both bulleted and numbered) and format appropriately  
 3. Recognize quotes, citations, and special blocks
 4. Preserve all original text content exactly
 5. Add markdown formatting only where it enhances structure
-6. Use heading levels (# ## ###) based on document hierarchy
+6. Use heading levels (# ## ###) based on document hierarchy as described above
 7. Format code blocks if you detect code snippets
 8. Identify tables and convert to markdown table format
 9. ITALICIZE non-English text and transliterated text with *text* formatting:
@@ -51,13 +68,30 @@ Instructions:
    - Detect Sanskrit/spiritual quotes at the beginning of chapters
    - Format as centered blockquotes with this pattern:
      > *Sanskrit transliteration in italics*
-     > 
      > English translation
-     > 
-     > — Source citation
-   - Use > for blockquote and ensure proper spacing
+     > Source citation
+   - Use > for blockquote with single line breaks
    - The transliteration should be italicized
-   - The source should start with em dash (—)
+   - Remove any em dashes from citations
+11. SPECIAL FORMATTING for hierarchical lists (like roles, principles, qualities):
+   - Look for patterns like "Transformational Roles", "Meta Roles", "Principles", "Types", "Aspects", etc.
+   - Format these headers using appropriate heading level based on document context (don't force H2)
+   - CRITICAL: Format numbered items with their numbers but NOT as markdown numbered lists
+   - To preserve the numbers, add a backslash before the period: 1\. The Teacher (not 1. The Teacher)
+   - Format sub-items with bullet points (•) and proper indentation (4 spaces)
+   - Example pattern:
+     [Appropriate heading level] Transformational Roles
+     
+     16\. The Facilitator of Surrender
+         • Teaches active alignment with divine will
+         • Shows strength through yielding
+         • Guides through release
+     
+     17\. The Mirror of Possibility
+         • Reflects highest potential back to seekers
+         • Shows what is possible
+   - Use bullet character • (not -) with 4-space indentation for sub-items
+   - This creates proper visual hierarchy while preserving exact numbering
 
 CRITICAL REQUIREMENTS:
 - Process the ENTIRE document in one response
@@ -196,8 +230,13 @@ Text to convert:
             if (len(stripped) < 100 and 
                 (stripped.istitle() or stripped.isupper()) and 
                 not any(stripped.startswith(c) for c in ['-', '*', '•', '1', '2', '3'])):
-                # Add heading
-                markdown_lines.append(f"\n## {stripped}\n")
+                # Check if it's a section or chapter
+                if any(word in stripped.lower() for word in ['section', 'part', 'chapter']):
+                    # Use H1 for sections and chapters
+                    markdown_lines.append(f"\n# {stripped}\n")
+                else:
+                    # Use H2 for other headings
+                    markdown_lines.append(f"\n## {stripped}\n")
                 in_list = False
             # Detect list items
             elif any(stripped.startswith(c) for c in ['-', '*', '•']):
@@ -334,7 +373,8 @@ Text to convert:
     
     def convert_with_ai(self, input_path: str, output_path: Optional[str] = None) -> bool:
         """Convert document using AI analysis."""
-        input_path = Path(input_path)
+        # Resolve any aliases or symlinks
+        input_path = Path(resolve_path(input_path))
         
         if not output_path:
             output_path = input_path.parent / f"{input_path.stem}_formatted.docx"
@@ -492,6 +532,7 @@ def main():
     parser.add_argument('input_file', help='Input file to convert')
     parser.add_argument('output_file', nargs='?', help='Output file path (optional)')
     parser.add_argument('--reference', '-r', help='Reference format document path')
+    parser.add_argument('--config', '-c', help='Configuration file path')
     
     args = parser.parse_args()
     
@@ -507,7 +548,11 @@ def main():
     else:
         # Find default reference format file
         script_dir = Path(__file__).parent
-        reference_path = script_dir / "referenceformat.docx"
+        reference_path = script_dir / "References" / "referenceformat.docx"
+        
+        if not reference_path.exists():
+            # Try old location for backward compatibility
+            reference_path = script_dir / "referenceformat.docx"
         
         if not reference_path.exists():
             reference_path = Path.home() / "Documents" / "referenceformat.docx"
@@ -517,13 +562,14 @@ def main():
         
         if not reference_path.exists():
             print("Error: Reference format file not found. Please place 'referenceformat.docx' in one of these locations:")
+            print(f"  - {script_dir / 'References'}")
             print(f"  - {script_dir}")
             print(f"  - {Path.home() / 'Documents'}")
             print(f"  - {Path.home() / 'Desktop'}")
             sys.exit(1)
     
     # Create converter and process
-    converter = AIDocumentConverter(str(reference_path))
+    converter = AIDocumentConverter(str(reference_path), config_path=args.config)
     success = converter.convert_with_ai(input_file, output_file)
     
     sys.exit(0 if success else 1)

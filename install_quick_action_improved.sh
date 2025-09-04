@@ -1,18 +1,26 @@
 #!/bin/bash
-# Installer script for Format Document Quick Action
+# Improved installer script for Format Document Quick Action
 
-echo "Installing Format Document Quick Action..."
+echo "Installing Format Document Quick Action (Improved)..."
 
 # Create the Automator workflow file
 WORKFLOW_PATH="$HOME/Library/Services/Format with Reference Style.workflow"
 mkdir -p "$WORKFLOW_PATH/Contents"
 
-# Create the workflow plist file
+# Create the improved workflow plist file with specific file types
 cat > "$WORKFLOW_PATH/Contents/Info.plist" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.wordformatter.quickaction</string>
+    <key>CFBundleName</key>
+    <string>Format with Reference Style</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
     <key>NSServices</key>
     <array>
         <dict>
@@ -25,7 +33,21 @@ cat > "$WORKFLOW_PATH/Contents/Info.plist" << 'EOF'
             <string>runWorkflowAsService</string>
             <key>NSSendFileTypes</key>
             <array>
-                <string>public.item</string>
+                <string>public.plain-text</string>
+                <string>public.utf8-plain-text</string>
+                <string>com.adobe.rtf</string>
+                <string>public.rtf</string>
+                <string>net.daringfireball.markdown</string>
+                <string>public.text</string>
+                <string>org.openxmlformats.wordprocessingml.document</string>
+                <string>com.microsoft.word.doc</string>
+            </array>
+            <key>NSRequiredContext</key>
+            <array>
+                <dict>
+                    <key>NSApplicationIdentifier</key>
+                    <string>com.apple.finder</string>
+                </dict>
             </array>
         </dict>
     </array>
@@ -33,7 +55,7 @@ cat > "$WORKFLOW_PATH/Contents/Info.plist" << 'EOF'
 </plist>
 EOF
 
-# Create the main workflow document
+# Create the main workflow document (same as before but with better structure)
 cat > "$WORKFLOW_PATH/Contents/document.wflow" << 'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -243,15 +265,25 @@ done</string>
 </plist>
 EOF
 
+# Make the workflow executable
+chmod +x "$WORKFLOW_PATH"
+
 echo "Quick Action installed successfully!"
 echo ""
-echo "IMPORTANT: Before using the Quick Action, you need to:"
-echo "1. Place your reference Word document named 'referenceformat.docx' in one of these locations:"
-echo "   - /Users/KDP/scripts/wordformatterbyclaude/"
-echo "   - ~/Documents/"
-echo "   - ~/Desktop/"
+echo "Now forcing macOS to refresh the services..."
+
+# Force macOS to refresh services
+/System/Library/CoreServices/pbs -flush
+killall pbs
+/System/Library/CoreServices/pbs -update
+killall Finder
+
 echo ""
-echo "2. Right-click on any .txt, .md, .rtf, or .docx file in Finder"
-echo "3. Select 'Quick Actions' > 'Format with Reference Style'"
+echo "IMPORTANT: After Finder restarts, you may need to:"
+echo "1. Open System Settings > Privacy & Security > Extensions > Finder Extensions"
+echo "2. Make sure 'Format with Reference Style' is enabled"
+echo ""
+echo "Then right-click on any .txt, .md, .rtf, or .docx file in Finder"
+echo "and select 'Quick Actions' > 'Format with Reference Style'"
 echo ""
 echo "The formatted file will be created in the same directory with '_formatted' suffix."

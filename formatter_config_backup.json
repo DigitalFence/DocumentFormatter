@@ -1,0 +1,94 @@
+{
+  "heading_overrides": {
+    "comment": "Override heading styles. Set to null to use template defaults",
+    "heading_3": {
+      "alignment": "center",
+      "italic": false,
+      "bold": null,
+      "font_name": null,
+      "font_size": null
+    },
+    "heading_4": {
+      "alignment": "left",
+      "italic": true,
+      "bold": null,
+      "font_name": null,
+      "font_size": null
+    }
+  },
+  "heading_detection": {
+    "title_keywords": ["title"],
+    "dedication_keywords": ["dedicated to", "dedication", "in memory of"],
+    "contents_keywords": ["contents", "table of contents", "toc"],
+    "section_keywords": ["section", "part"],
+    "chapter_keywords": ["chapter"],
+    "always_use_heading_2_for_chapters": true
+  },
+  "page_breaks": {
+    "before_sections": false,
+    "before_chapters": true,
+    "after_title": true,
+    "after_dedication": true,
+    "after_contents": true,
+    "preserve_original": true
+  },
+  "blockquote_formatting": {
+    "remove_em_dashes": true,
+    "single_line_spacing": true,
+    "center_align": true
+  },
+  "chapter_opening_quote": {
+    "enabled": true,
+    "subtle_emphasis": true,
+    "font_size_reduction": 1,
+    "italic": true,
+    "color": "666666",
+    "spacing_after": 18,
+    "detect_patterns": ["verse", "quote", "translation", "transliteration"]
+  },
+  "chapter_closing_content": {
+    "enabled": true,
+    "subtle_emphasis": true,
+    "font_size_reduction": 1,
+    "italic": true,
+    "color": "666666",
+    "spacing_before": 18,
+    "detect_patterns": ["story", "poem", "verse"]
+  },
+  "chapter_separator": {
+    "enabled": true,
+    "symbol": "❦",
+    "symbol_source": "/Users/KDP/Documents/WordTemplates/Symbols.docx",
+    "comment": "Set symbol_source to path of Word doc to extract first symbol from it",
+    "position": "after",
+    "spacing_before": 12,
+    "spacing_after": 12,
+    "font_size": 14
+  },
+  "special_content_formatting": {
+    "hierarchical_lists": {
+      "enabled": true,
+      "detect_patterns": [
+        "roles",
+        "principles",
+        "teachings",
+        "qualities",
+        "attributes",
+        "characteristics",
+        "types",
+        "categories",
+        "elements",
+        "aspects",
+        "dimensions"
+      ],
+      "numbered_item_style": "Normal (Web)",
+      "bullet_point_style": "List Paragraph",
+      "detection_rules": {
+        "numbered_pattern": "^\\d+\\.\\s+[A-Z]",
+        "section_keywords": ["roles", "principles", "qualities", "attributes", "types", "aspects"],
+        "min_items": 2,
+        "auto_detect_heading": true
+      }
+    }
+  }
+}

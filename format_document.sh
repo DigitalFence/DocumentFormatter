@@ -13,8 +13,17 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo "Script directory: $SCRIPT_DIR"
 
 # Set the reference format document path
-REFERENCE_FORMAT="$SCRIPT_DIR/referenceformat.docx"
+REFERENCE_FORMAT="$SCRIPT_DIR/References/referenceformat.docx"
 echo "Using reference format: $REFERENCE_FORMAT"
+
+# Set the configuration file path
+CONFIG_FILE="$SCRIPT_DIR/References/formatter_config.json"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "WARNING: Configuration file not found at $CONFIG_FILE"
+    CONFIG_FILE=""
+else
+    echo "Using configuration file: $CONFIG_FILE"
+fi
 
 # Check virtual environment
 if [ ! -d "$SCRIPT_DIR/venv" ]; then
@@ -125,7 +134,13 @@ for file in "$@"; do
             export CLAUDE_CLI_PATH="$claude_path"
             # Enable debug logging
             export WORD_FORMATTER_DEBUG=1
-            python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" "$file"
+            
+            # Add config file parameter if available
+            if [ -n "$CONFIG_FILE" ]; then
+                python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" --config "$CONFIG_FILE" "$file"
+            else
+                python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" "$file"
+            fi
             converter_exit_code=$?
             echo "AI converter exit code: $converter_exit_code"
             
@@ -149,7 +164,14 @@ for file in "$@"; do
             
             # Enable debug logging
             export WORD_FORMATTER_DEBUG=1
-            python "$SCRIPT_DIR/document_converter_simple.py" --reference "$REFERENCE_FORMAT" "$file"
+            
+            # Note: document_converter_simple.py doesn't support config yet
+            # Using document_converter.py instead for consistency
+            if [ -n "$CONFIG_FILE" ]; then
+                python "$SCRIPT_DIR/document_converter.py" --input "$file" --reference "$REFERENCE_FORMAT" --config "$CONFIG_FILE"
+            else
+                python "$SCRIPT_DIR/document_converter.py" --input "$file" --reference "$REFERENCE_FORMAT"
+            fi
             converter_exit_code=$?
             echo "Simple converter exit code: $converter_exit_code"
             
@@ -167,7 +189,12 @@ for file in "$@"; do
         filename=$(basename "$file")
         send_notification "Word Formatter" "Standard Conversion" "Processing $filename (non-text file)" "Glass"
         
-        python "$SCRIPT_DIR/document_converter_simple.py" "$file"
+        # Use document_converter.py with config support
+        if [ -n "$CONFIG_FILE" ]; then
+            python "$SCRIPT_DIR/document_converter.py" --input "$file" --reference "$REFERENCE_FORMAT" --config "$CONFIG_FILE"
+        else
+            python "$SCRIPT_DIR/document_converter.py" --input "$file" --reference "$REFERENCE_FORMAT"
+        fi
         converter_exit_code=$?
         echo "Simple converter exit code: $converter_exit_code"
         
