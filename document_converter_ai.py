@@ -46,17 +46,17 @@ Instructions:
    - The document title should be marked as a regular # (H1) heading
    - Example: # The Complete Guide to Spiritual Wisdom
    - This will be automatically converted to Title style during processing
-2. Identify and mark other headings based on context and formatting cues:
+2. CRITICAL HEADING RULES (follow exactly):
+   - ALWAYS use # (H1) for "Table of Contents", "Contents", or "TOC" - treat like a chapter
+   - ALWAYS use # (H1) for chapters like "Preface", "Introduction", chapter titles
    - Main sections or parts should use # (H1) - look for "Section", "Part", or similar major divisions
-   - Chapters should use # (H1) - this includes:
-     * Explicit chapters: "Chapter 1", "Chapter One", "Chapter: Title"
-     * Standalone chapter titles: "The Final Thread", "You Are Yet to Meet", "The Journey Begins"
-     * IMPORTANT: All major headings (title, chapters, sections) use # (H1)
-   - Examples of correct formatting:
-     * # The Master (document title)
-     * # Chapter 1: The Foundation (chapter)
-     * # The Master as Pattern Interruptor (chapter)
-     * # You Are Yet to Meet (chapter)
+   - Examples of MANDATORY formatting:
+     * # The Master (document title - H1)
+     * # Table of Contents (ALWAYS H1 - treated like a chapter)
+     * # Preface (chapter - ALWAYS H1)
+     * # You Are Yet to Meet (chapter - ALWAYS H1)
+     * # The Master as Pattern Interruptor (chapter - ALWAYS H1)
+     * # The Final Thread (chapter - ALWAYS H1)
    - Sub-sections within chapters should use ## (H2)
    - Sub-sub-sections should use ### (H3), and so on
 3. Detect lists (both bulleted and numbered) and format appropriately  
@@ -109,9 +109,11 @@ CRITICAL REQUIREMENTS:
 - Convert ALL text provided, regardless of length
 - No explanations, questions, or meta-commentary
 - Return ONLY the complete markdown formatted text
-- Use # (H1) for the title and all major headings (chapters, sections)
+- Use # (H1) for the title, TOC, and chapters; ## (H2) for sub-sections
 
-Important:
+CRITICAL REMINDERS:
+- Table of Contents MUST be # (H1) - treat like a chapter
+- All chapters MUST be # (H1)
 - Do not add any content that wasn't in the original
 - Maintain the original tone and style
 - Focus on structure, not rewriting

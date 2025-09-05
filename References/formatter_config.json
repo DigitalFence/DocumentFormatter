@@ -63,7 +63,7 @@
     "before_chapters": true,
     "after_title": true,
     "after_dedication": true,
-    "after_contents": true,
+    "after_contents": false,
     "preserve_original": true
   },
   "blockquote_formatting": {

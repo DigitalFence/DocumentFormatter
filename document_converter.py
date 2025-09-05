@@ -667,10 +667,10 @@ class DocumentConverter:
         if text_lower in ['contents', 'table of contents', 'toc'] or 'table of contents' in text_lower:
             return 'contents'
         
-        if text_lower == 'preface' or text_lower.startswith('preface'):
+        if text_lower == 'preface':
             return 'preface'
         
-        if text_lower == 'foreword' or text_lower.startswith('foreword'):
+        if text_lower == 'foreword':
             return 'foreword'
         
         return None
@@ -1007,13 +1007,20 @@ class DocumentConverter:
                     
                     # Add separator at end of previous chapter if we were in one
                     if self.current_chapter_started:
-                        separator_settings = self.config.get_chapter_separator()
-                        if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
-                            self._add_chapter_separator(separator_settings)
-                            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                                print(f"DEBUG: Added chapter separator at end of '{self.current_chapter_name}' before starting '{heading_text}'")
-                            else:
-                                print(f"Added separator at end of chapter: {self.current_chapter_name}")
+                        # Skip separator after intro sections (TOC, Preface) - they're not content chapters
+                        if ('table of contents' not in self.current_chapter_name.lower() and 
+                            'contents' != self.current_chapter_name.lower() and 
+                            'toc' != self.current_chapter_name.lower() and
+                            'preface' != self.current_chapter_name.lower()):
+                            separator_settings = self.config.get_chapter_separator()
+                            if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
+                                self._add_chapter_separator(separator_settings)
+                                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                                    print(f"DEBUG: Added chapter separator at end of '{self.current_chapter_name}' before starting '{heading_text}'")
+                                else:
+                                    print(f"Added separator at end of chapter: {self.current_chapter_name}")
+                        elif os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Skipped separator after intro section: '{self.current_chapter_name}'")
                     
                     # Simple rule: Always add page break before chapters (H1 headings)
                     if len(self.output_doc.paragraphs) > 0:
@@ -1060,14 +1067,8 @@ class DocumentConverter:
             if use_title_style:
                 special_section = 'title'
             
-            # Add page break BEFORE special sections (except title)
-            # Contents should have its own page break before it
-            if special_section and special_section != 'title' and len(self.output_doc.paragraphs) > 0:
-                self.output_doc.add_page_break()
-                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                    print(f"DEBUG: Added page break BEFORE {special_section} section")
-                else:
-                    print(f"Added page break before {special_section}")
+            # Special section page breaks are handled in paragraph processing, not for headings
+            # Headings get their page breaks from heading/chapter logic
             
             # Add the heading or title
             if use_title_style or special_section == 'title':
