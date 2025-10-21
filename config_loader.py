@@ -94,21 +94,39 @@ class FormatterConfig:
     
     def get_heading_override(self, heading_level: int) -> Optional[Dict[str, Any]]:
         """Get heading style override for a specific level.
-        
+
         Args:
             heading_level: The heading level (1-6)
-            
+
         Returns:
             Dictionary of style overrides or None if no overrides defined
         """
         heading_key = f"heading_{heading_level}"
         overrides = self.config.get("heading_overrides", {})
-        
+
         if heading_key in overrides:
             override = overrides[heading_key]
             # Filter out null values
             return {k: v for k, v in override.items() if v is not None and k != "comment"}
-        
+
+        return None
+
+    def get_style_override(self, style_name: str) -> Optional[Dict[str, Any]]:
+        """Get style override for a specific style name.
+
+        Args:
+            style_name: The style name (e.g., 'Normal', 'Title', 'Subtitle')
+
+        Returns:
+            Dictionary of style overrides or None if no overrides defined
+        """
+        overrides = self.config.get("style_overrides", {})
+
+        if style_name in overrides:
+            override = overrides[style_name]
+            # Filter out null values
+            return {k: v for k, v in override.items() if v is not None and k != "comment"}
+
         return None
     
     def should_apply_page_break(self, element_type: str) -> bool:

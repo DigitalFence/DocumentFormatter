@@ -50,6 +50,12 @@ except ImportError:
     # If config_loader is not available, create a dummy
     FormatterConfig = None
 
+try:
+    from striprtf.striprtf import rtf_to_text
+    RTF_SUPPORT = True
+except ImportError:
+    RTF_SUPPORT = False
+
 
 class StyleExtractor:
     """Extracts formatting styles from a reference Word document."""
@@ -844,10 +850,21 @@ class DocumentConverter:
         """Convert input document to styled Word document."""
         # Resolve any aliases or symlinks
         input_path = Path(resolve_path(input_path))
-        
+
         # Determine file type and read content
         if input_path.suffix.lower() == '.txt':
             content = self._read_text_file(input_path)
+            self._process_text_content(content)
+        elif input_path.suffix.lower() == '.rtf':
+            if not RTF_SUPPORT:
+                raise ValueError("RTF support requires striprtf library. Install with: pip install striprtf")
+            # Read RTF and convert to plain text
+            print(f"Converting RTF to plain text...")
+            with open(input_path, 'r', encoding='utf-8') as f:
+                rtf_content = f.read()
+            content = rtf_to_text(rtf_content)
+            print(f"Extracted {len(content)} characters from RTF")
+            # Process as text content (striprtf gives us plain text)
             self._process_text_content(content)
         elif input_path.suffix.lower() in ['.md', '.markdown']:
             content = self._read_markdown_file(input_path)
@@ -1075,6 +1092,35 @@ class DocumentConverter:
                 # Use Title style instead of heading
                 heading = self.output_doc.add_paragraph(heading_text)
                 heading.style = 'Title'
+
+                # Apply Title style overrides from configuration
+                if self.config and hasattr(self.config, 'get_style_override'):
+                    title_override = self.config.get_style_override('Title')
+                    if title_override:
+                        # Apply font properties to all runs
+                        for run in heading.runs:
+                            if 'font_name' in title_override and title_override['font_name'] is not None:
+                                run.font.name = title_override['font_name']
+                            if 'font_size' in title_override and title_override['font_size'] is not None:
+                                run.font.size = Pt(title_override['font_size'])
+                            if 'italic' in title_override and title_override['italic'] is not None:
+                                run.italic = title_override['italic']
+                            if 'bold' in title_override and title_override['bold'] is not None:
+                                run.bold = title_override['bold']
+
+                        # Apply paragraph formatting
+                        if 'alignment' in title_override:
+                            alignment_map = {
+                                'left': WD_ALIGN_PARAGRAPH.LEFT,
+                                'center': WD_ALIGN_PARAGRAPH.CENTER,
+                                'right': WD_ALIGN_PARAGRAPH.RIGHT,
+                                'justify': WD_ALIGN_PARAGRAPH.JUSTIFY
+                            }
+                            if title_override['alignment'] in alignment_map:
+                                heading.alignment = alignment_map[title_override['alignment']]
+                        if 'line_spacing' in title_override and title_override['line_spacing'] is not None:
+                            heading.paragraph_format.line_spacing = title_override['line_spacing']
+
                 # Mark as special section if detected
                 if special_section:
                     self._handle_special_section_page_break(special_section)
@@ -1084,8 +1130,8 @@ class DocumentConverter:
                 if special_section:
                     self._handle_special_section_page_break(special_section)
             
-            # Apply heading overrides from configuration if style overrides are enabled
-            if self.config and self.use_config and self.style_extractor:
+            # Apply heading overrides from configuration if available
+            if self.config and hasattr(self.config, 'get_heading_override'):
                 override = self.config.get_heading_override(word_heading_level)
                 if override:
                     # Apply alignment
@@ -1102,13 +1148,13 @@ class DocumentConverter:
                     # Apply font properties to all runs
                     for run in heading.runs:
                         # First apply reference document font if available
-                        if 'headings' in self.style_extractor.styles:
+                        if self.style_extractor and hasattr(self.style_extractor, 'styles') and 'headings' in self.style_extractor.styles:
                             heading_style_name = f'Heading {word_heading_level}'
                             if heading_style_name in self.style_extractor.styles['headings']:
                                 ref_style = self.style_extractor.styles['headings'][heading_style_name]
                                 if 'font' in ref_style and ref_style['font'].get('name'):
                                     run.font.name = ref_style['font']['name']
-                        
+
                         # Then apply overrides (only if explicitly set, not None)
                         if 'italic' in override and override['italic'] is not None:
                             run.italic = override['italic']
@@ -1190,9 +1236,11 @@ class DocumentConverter:
                     bq_settings = self.config.get_blockquote_settings()
                     center_align = bq_settings.get('center_align', True)
                     remove_em_dashes = bq_settings.get('remove_em_dashes', True)
+                    force_italic = bq_settings.get('italic', False)
                 else:
                     center_align = True
                     remove_em_dashes = True
+                    force_italic = False
                 
                 # Check if this is a chapter opening quote
                 is_opening_quote = False
@@ -1320,6 +1368,11 @@ class DocumentConverter:
                         run.style = 'Emphasis'
                     if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                         print(f"DEBUG: Applied Emphasis character style to chapter opening quote blockquote")
+
+                # Apply italic formatting to all blockquote runs if configured
+                if force_italic and not is_opening_quote:
+                    for run in para.runs:
+                        run.italic = True
                 
                 # Track this element for chapter end detection
                 if self.current_chapter_started:
@@ -1440,7 +1493,17 @@ class DocumentConverter:
                             style_names = [style.name for style in self.output_doc.styles]
                             if bullet_style in style_names:
                                 para.style = bullet_style
-                            
+
+                            # Apply Normal style overrides (including Aptos Light font) to list items
+                            if self.config and hasattr(self.config, 'get_style_override'):
+                                normal_override = self.config.get_style_override('Normal')
+                                if normal_override and para.runs:
+                                    for run in para.runs:
+                                        if 'font_name' in normal_override and normal_override['font_name'] is not None:
+                                            run.font.name = normal_override['font_name']
+                                        if 'font_size' in normal_override and normal_override['font_size'] is not None:
+                                            run.font.size = Pt(normal_override['font_size'])
+
                             if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                                 print(f"DEBUG: Applied tab indentation to bullet point: '{bullet_text[:30]}...'")
                     else:
@@ -1646,11 +1709,39 @@ class DocumentConverter:
                     # Use Title style instead of heading
                     heading = self.output_doc.add_paragraph(heading_text)
                     heading.style = 'Title'
+
+                    # Apply Title style overrides from configuration
+                    if self.config and hasattr(self.config, 'get_style_override'):
+                        title_override = self.config.get_style_override('Title')
+                        if title_override:
+                            # Apply font properties to all runs
+                            for run in heading.runs:
+                                if 'font_name' in title_override and title_override['font_name'] is not None:
+                                    run.font.name = title_override['font_name']
+                                if 'font_size' in title_override and title_override['font_size'] is not None:
+                                    run.font.size = Pt(title_override['font_size'])
+                                if 'italic' in title_override and title_override['italic'] is not None:
+                                    run.italic = title_override['italic']
+                                if 'bold' in title_override and title_override['bold'] is not None:
+                                    run.bold = title_override['bold']
+
+                            # Apply paragraph formatting
+                            if 'alignment' in title_override:
+                                alignment_map = {
+                                    'left': WD_ALIGN_PARAGRAPH.LEFT,
+                                    'center': WD_ALIGN_PARAGRAPH.CENTER,
+                                    'right': WD_ALIGN_PARAGRAPH.RIGHT,
+                                    'justify': WD_ALIGN_PARAGRAPH.JUSTIFY
+                                }
+                                if title_override['alignment'] in alignment_map:
+                                    heading.alignment = alignment_map[title_override['alignment']]
+                            if 'line_spacing' in title_override and title_override['line_spacing'] is not None:
+                                heading.paragraph_format.line_spacing = title_override['line_spacing']
                 else:
                     heading = self.output_doc.add_heading(heading_text, level=word_heading_level)
                 
                 # Apply heading overrides from configuration if available
-                if self.config:
+                if self.config and hasattr(self.config, 'get_heading_override'):
                     override = self.config.get_heading_override(word_heading_level)
                     if override:
                         # Apply alignment
@@ -1663,16 +1754,16 @@ class DocumentConverter:
                             }
                             if override['alignment'] in alignment_map:
                                 heading.alignment = alignment_map[override['alignment']]
-                        
+
                         # Apply font properties to all runs
                         for run in heading.runs:
-                            if 'italic' in override:
+                            if 'italic' in override and override['italic'] is not None:
                                 run.italic = override['italic']
-                            if 'bold' in override:
+                            if 'bold' in override and override['bold'] is not None:
                                 run.bold = override['bold']
-                            if 'font_name' in override:
+                            if 'font_name' in override and override['font_name'] is not None:
                                 run.font.name = override['font_name']
-                            if 'font_size' in override:
+                            if 'font_size' in override and override['font_size'] is not None:
                                 run.font.size = Pt(override['font_size'])
             
             # Process lists
@@ -1714,9 +1805,12 @@ class DocumentConverter:
                         new_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     new_para.paragraph_format.space_before = Pt(12)
                     new_para.paragraph_format.space_after = Pt(12)
-                
+                    force_italic_bq = bq_settings.get('italic', False)
+                else:
+                    force_italic_bq = False
+
                 # Copy paragraph alignment if not a blockquote
-                elif para.alignment is not None and not is_blockquote:
+                if para.alignment is not None and not is_blockquote:
                     new_para.alignment = para.alignment
                 
                 # Copy runs with formatting
@@ -1730,7 +1824,7 @@ class DocumentConverter:
                     
                     new_run = new_para.add_run(text)
                     new_run.bold = run.bold
-                    new_run.italic = run.italic
+                    new_run.italic = run.italic if not force_italic_bq else True
                     new_run.underline = run.underline
                     if run.font.color and run.font.color.rgb:
                         new_run.font.color.rgb = run.font.color.rgb
@@ -1770,14 +1864,15 @@ class DocumentConverter:
     
     def _apply_reference_styles(self):
         """Apply styles from reference document to output document."""
-        # Only apply if we're using config (otherwise template styles are already in place)
-        if not self.use_config or not self.style_extractor:
-            return
-        
-        styles = self.style_extractor.styles
-        
-        # Apply document-level styles
-        if 'document' in styles and 'margins' in styles['document']:
+        # Apply reference styles if style extractor is available
+        if self.use_config and self.style_extractor:
+            styles = self.style_extractor.styles
+        else:
+            styles = None
+
+
+        # Apply document-level styles from reference if available
+        if styles and 'document' in styles and 'margins' in styles['document']:
             section = self.output_doc.sections[0]
             margins = styles['document']['margins']
             if margins['top']:
@@ -1788,16 +1883,46 @@ class DocumentConverter:
                 section.left_margin = margins['left']
             if margins['right']:
                 section.right_margin = margins['right']
-        
-        # Apply normal style
-        if 'normal' in styles and styles['normal']:
+
+        # Apply normal style from reference if available
+        if styles and 'normal' in styles and styles['normal']:
             normal_style = styles['normal']
             for para in self.output_doc.paragraphs:
                 if para.style.name == 'Normal':
                     self._apply_paragraph_style(para, normal_style)
+
+        # ALWAYS apply Normal style overrides from configuration if config exists
+        if self.config and hasattr(self.config, 'get_style_override'):
+            normal_override = self.config.get_style_override('Normal')
+            if normal_override:
+                for para in self.output_doc.paragraphs:
+                    if para.style.name == 'Normal':
+                        # Apply font properties to all runs
+                        for run in para.runs:
+                            if 'font_name' in normal_override and normal_override['font_name'] is not None:
+                                run.font.name = normal_override['font_name']
+                            if 'font_size' in normal_override and normal_override['font_size'] is not None:
+                                run.font.size = Pt(normal_override['font_size'])
+                            if 'italic' in normal_override and normal_override['italic'] is not None:
+                                run.italic = normal_override['italic']
+                            if 'bold' in normal_override and normal_override['bold'] is not None:
+                                run.bold = normal_override['bold']
+
+                        # Apply paragraph formatting
+                        if 'line_spacing' in normal_override and normal_override['line_spacing'] is not None:
+                            para.paragraph_format.line_spacing = normal_override['line_spacing']
+                        if 'alignment' in normal_override:
+                            alignment_map = {
+                                'left': WD_ALIGN_PARAGRAPH.LEFT,
+                                'center': WD_ALIGN_PARAGRAPH.CENTER,
+                                'right': WD_ALIGN_PARAGRAPH.RIGHT,
+                                'justify': WD_ALIGN_PARAGRAPH.JUSTIFY
+                            }
+                            if normal_override['alignment'] in alignment_map:
+                                para.alignment = alignment_map[normal_override['alignment']]
         
-        # Apply heading styles
-        if 'headings' in styles:
+        # Apply heading styles from reference if available
+        if styles and 'headings' in styles:
             for para in self.output_doc.paragraphs:
                 if para.style and 'Heading' in para.style.name:
                     if para.style.name in styles['headings']:

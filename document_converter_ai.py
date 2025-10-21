@@ -149,7 +149,16 @@ Text to convert:
             
             if result.returncode == 0 and result.stdout.strip():
                 output = result.stdout.strip()
-                
+
+                # Remove markdown code fences if Claude wrapped the output
+                import re
+                # Check if output starts with ```markdown or ``` and ends with ```
+                if output.startswith('```'):
+                    # Remove opening code fence (```markdown or just ```)
+                    output = re.sub(r'^```(?:markdown)?\s*\n', '', output)
+                    # Remove closing code fence
+                    output = re.sub(r'\n```\s*$', '', output)
+
                 # Check for incomplete response patterns
                 incomplete_patterns = [
                     "Would you like me to continue",
@@ -158,9 +167,12 @@ Text to convert:
                     "Let me know if",
                     "I can continue",
                     "break it down into",
-                    "manageable sections"
+                    "manageable sections",
+                    "I'd be happy to help",
+                    "Could you please provide",
+                    "Please paste the text"
                 ]
-                
+
                 if any(pattern.lower() in output.lower() for pattern in incomplete_patterns):
                     error_msg = "Claude returned an incomplete response (asked for confirmation)"
                     if self.show_progress:
