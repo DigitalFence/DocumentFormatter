@@ -318,6 +318,75 @@ Text to convert:
 
         return text
     
+    def _remove_duplicate_h1_headings(self, markdown_content: str) -> str:
+        """
+        Remove duplicate H1 headings from single-chapter documents.
+
+        In single-chapter documents, there should only be ONE H1 heading (the chapter title).
+        Sometimes Claude AI accidentally generates duplicate H1 headings, which causes
+        sections to be misidentified as new chapters.
+
+        This function detects and removes duplicate H1 headings while preserving the first one.
+        """
+        import re
+
+        # Find all H1 headings (lines starting with # followed by space)
+        h1_pattern = r'^# (?!#)(.*?)$'
+        h1_matches = list(re.finditer(h1_pattern, markdown_content, re.MULTILINE))
+
+        if len(h1_matches) <= 1:
+            # No duplicates, nothing to fix
+            return markdown_content
+
+        # Check if this is a book (has TOC) or single chapter
+        has_toc = bool(re.search(r'^# (?:Table of Contents|Contents|TOC)$', markdown_content, re.MULTILINE | re.IGNORECASE))
+
+        if has_toc:
+            # This is a book with TOC - multiple H1s are expected (Title, TOC, Chapter 1, Chapter 2, etc.)
+            return markdown_content
+
+        # Single chapter document with duplicate H1 headings - keep only the first one
+        if self.debug:
+            print(f"⚠️  WARNING: Found {len(h1_matches)} H1 headings in single-chapter document")
+            print(f"   First H1: '{h1_matches[0].group(1)}'")
+            for i, match in enumerate(h1_matches[1:], start=2):
+                print(f"   Duplicate #{i}: '{match.group(1)}' at position {match.start()}")
+
+        # Remove all duplicate H1 headings (keep only the first)
+        lines = markdown_content.split('\n')
+        first_h1_line = None
+        lines_to_remove = []
+
+        for i, line in enumerate(lines):
+            if re.match(h1_pattern, line):
+                if first_h1_line is None:
+                    first_h1_line = i
+                else:
+                    # This is a duplicate - mark for removal
+                    lines_to_remove.append(i)
+                    if self.debug:
+                        print(f"   Removing duplicate H1 at line {i+1}: {line}")
+
+        # Remove duplicate H1 lines (and any empty line immediately after)
+        cleaned_lines = []
+        skip_next_empty = False
+        for i, line in enumerate(lines):
+            if i in lines_to_remove:
+                skip_next_empty = True
+                continue
+            if skip_next_empty and line.strip() == '':
+                skip_next_empty = False
+                continue
+            cleaned_lines.append(line)
+            skip_next_empty = False
+
+        cleaned_content = '\n'.join(cleaned_lines)
+
+        if self.show_progress and len(h1_matches) > 1:
+            print(f"   ✓ Removed {len(h1_matches) - 1} duplicate H1 heading(s)")
+
+        return cleaned_content
+
     def _simple_text_to_markdown(self, text_content: str, is_first_chunk: bool = True) -> str:
         """
         Simple fallback conversion from text to markdown.
@@ -571,7 +640,12 @@ Text to convert:
                 pass
         
         # Reassemble the markdown
-        return '\n\n'.join(markdown_chunks)
+        markdown_content = '\n\n'.join(markdown_chunks)
+
+        # Post-process to remove duplicate H1 headings
+        markdown_content = self._remove_duplicate_h1_headings(markdown_content)
+
+        return markdown_content
     
     def convert_with_ai(self, input_path: str, output_path: Optional[str] = None) -> bool:
         """Convert document using AI analysis."""
