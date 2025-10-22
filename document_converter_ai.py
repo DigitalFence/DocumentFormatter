@@ -41,39 +41,66 @@ class AIDocumentConverter:
         """Create the prompt for Claude to analyze and structure text."""
         return f"""Convert the following plain text to well-structured markdown format.
 
-Instructions:
-1. TITLE DETECTION: 
-   - The document title should be marked as a regular # (H1) heading
-   - Example: # The Complete Guide to Spiritual Wisdom
-   - This will be automatically converted to Title style during processing
-2. CRITICAL HEADING RULES (follow exactly):
-   - ALWAYS use # (H1) for "Table of Contents", "Contents", or "TOC" - treat like a chapter
-   - ALWAYS use # (H1) for chapters like "Preface", "Introduction", chapter titles
-   - Main sections or parts should use # (H1) - look for "Section", "Part", or similar major divisions
-   - Examples of MANDATORY formatting:
-     * # The Master (document title - H1)
-     * # Table of Contents (ALWAYS H1 - treated like a chapter)
-     * # Preface (chapter - ALWAYS H1)
-     * # You Are Yet to Meet (chapter - ALWAYS H1)
-     * # The Master as Pattern Interruptor (chapter - ALWAYS H1)
-     * # The Final Thread (chapter - ALWAYS H1)
-   - Sub-sections within chapters should use ## (H2)
-   - Sub-sub-sections should use ### (H3), and so on
-3. Detect lists (both bulleted and numbered) and format appropriately  
-3. Recognize quotes, citations, and special blocks
-4. Preserve all original text content exactly
-5. Add markdown formatting only where it enhances structure
-6. Use heading levels (# ## ###) based on document hierarchy as described above
-7. Format code blocks if you detect code snippets
-8. Identify tables and convert to markdown table format
-9. ITALICIZE non-English text and transliterated text with *text* formatting:
+CRITICAL: Chapters use IDENTICAL formatting whether in a book or standalone!
+
+DOCUMENT TYPE DETECTION:
+Determine if this is:
+- **COMPLETE BOOK**: Has book title, Table of Contents, and multiple chapters
+- **SINGLE CHAPTER**: Just one chapter/talk without TOC
+
+HEADING STRUCTURE:
+
+FOR COMPLETE BOOKS:
+- # Book Title (becomes Title style in Word - largest font)
+- # Table of Contents (H1, treated like a chapter)
+- # Chapter 1: [Name] (H1)
+- ## Section in Chapter (H2)
+- ### Subsection (H3)
+
+FOR SINGLE CHAPTERS (no TOC, no book title):
+- # Chapter/Talk Title (H1 - same as chapter in book)
+- ## Section in Chapter (H2 - same as in book)
+- ### Subsection (H3 - same as in book)
+
+KEY POINT: A chapter has the same structure whether it's in a book or standalone. The only difference is books have Title + TOC before the chapters.
+
+UNIVERSAL FORMATTING RULES (apply to ALL):
+
+1. DETECT AND FORMAT SECTION HEADINGS:
+   - Identify major sections, subsections, and sub-subsections
+   - Use # (H1) for main title/chapter, ## (H2) for sections, ### (H3) for subsections
+   - Preserve the natural hierarchy of the content
+   - Headings should NOT end with periods, question marks, or exclamation points
+   - Keep headings concise (not full sentences)
+
+2. LISTS:
+   - Detect lists (both bulleted and numbered) and format appropriately
+   - Preserve list structure and indentation
+
+3. RECOGNIZE QUOTES, CITATIONS, AND SPECIAL BLOCKS:
+   - Format as blockquotes with > prefix
+   - Maintain proper citation formatting
+
+4. PRESERVE ALL ORIGINAL CONTENT:
+   - Do not add any content that wasn't in the original
+   - Maintain the original tone and style
+   - Focus on structure, not rewriting
+
+5. FORMAT CODE BLOCKS:
+   - Identify code snippets and format with triple backticks
+
+6. IDENTIFY TABLES:
+   - Convert to markdown table format
+
+7. ITALICIZE NON-ENGLISH TEXT with *text* formatting:
    - Sanskrit transliterations (text with diacritical marks like ā, ī, ū, ṛ, ṣ, ṇ, ṃ, ḥ, etc.)
    - Devanagari script (हिन्दी, संस्कृत)
    - Arabic, Hebrew, Chinese, Japanese, or any other non-Latin scripts
    - Romanized/transliterated words from other languages
    - Example: *Vāg vai brahma | vācā hy evedaṃ sarvaṃ sṛṣṭam*
-10. SPECIAL FORMATTING for chapter opening quotes:
-   - Detect Sanskrit/spiritual quotes at the beginning of chapters
+
+8. SPECIAL FORMATTING FOR OPENING QUOTES (sutras, epigraphs, etc.):
+   - Detect Sanskrit/spiritual quotes at the beginning of sections/chapters
    - Format as centered blockquotes with this pattern:
      > *Sanskrit transliteration in italics*
      > English translation
@@ -81,25 +108,31 @@ Instructions:
    - Use > for blockquote with single line breaks
    - The transliteration should be italicized
    - ALWAYS use em dash (—) before attribution/source, not hyphen (-)
-11. SPECIAL FORMATTING for hierarchical lists (like roles, principles, qualities):
+
+9. SPECIAL FORMATTING FOR HIERARCHICAL LISTS (roles, principles, qualities, etc.):
    - Look for patterns like "Transformational Roles", "Meta Roles", "Principles", "Types", "Aspects", etc.
-   - Format these headers using appropriate heading level based on document context (don't force H2)
+   - Format these headers using appropriate heading level based on document type and context
    - CRITICAL: Format numbered items with their numbers but NOT as markdown numbered lists
    - To preserve the numbers, add a backslash before the period: 1\. The Teacher (not 1. The Teacher)
    - Format sub-items with bullet points (•) and proper indentation (4 spaces)
    - Example pattern:
-     [Appropriate heading level] Transformational Roles
-     
+     ### Transformational Roles
+
      16\. The Facilitator of Surrender
          • Teaches active alignment with divine will
          • Shows strength through yielding
          • Guides through release
-     
+
      17\. The Mirror of Possibility
          • Reflects highest potential back to seekers
          • Shows what is possible
    - Use bullet character • (not -) with 4-space indentation for sub-items
    - This creates proper visual hierarchy while preserving exact numbering
+
+10. DIALOGUE FORMATTING:
+   - Keep dialogue as regular paragraphs with speaker names in bold
+   - Format as: **Speaker Name**: dialogue text
+   - Do NOT add bullet points to dialogue lines
 
 CRITICAL REQUIREMENTS:
 - Process the ENTIRE document in one response
@@ -107,17 +140,35 @@ CRITICAL REQUIREMENTS:
 - Do NOT break the response into parts or sections
 - Do NOT stop midway through the document
 - Convert ALL text provided, regardless of length
-- No explanations, questions, or meta-commentary
-- Return ONLY the complete markdown formatted text
-- Use # (H1) for the title, TOC, and chapters; ## (H2) for sub-sections
+- ABSOLUTELY NO explanations, analysis, questions, or meta-commentary
+- Do NOT include phrases like "Based on my analysis" or "This is a X document"
+- Return ONLY the complete markdown formatted text - start directly with the content
 
 CRITICAL REMINDERS:
-- Table of Contents MUST be # (H1) - treat like a chapter
-- All chapters MUST be # (H1)
-- Do not add any content that wasn't in the original
-- Maintain the original tone and style
-- Focus on structure, not rewriting
-- If the text already has clear structure, preserve it
+
+1. CHAPTER FORMATTING IS IDENTICAL:
+   - Single chapter "Talk 13: Love That Dares" → # Talk 13: Love That Dares (H1)
+   - Chapter in book "Chapter 5: The Journey" → # Chapter 5: The Journey (H1)
+   - Both use # (H1) for the chapter title
+   - Both use ## (H2) for sections within the chapter
+   - Both use ### (H3) for subsections
+
+2. BOOKS vs SINGLE CHAPTERS:
+   - Books START with: # Book Title, then # Table of Contents, then chapters
+   - Single chapters START with: # Chapter Title (no book title, no TOC)
+   - But the chapter itself has the same structure in both cases
+
+3. SPECIAL FORMATTING (apply to ALL):
+   - Italicize ALL non-English text (Sanskrit, transliterations, etc.)
+   - Format opening quotes/sutras as centered blockquotes: > *Sanskrit* > Translation
+   - Use proper hierarchical list formatting (escaped numbers: 1\.)
+   - Format dialogue with **Speaker**: text (no bullets)
+
+4. OUTPUT FORMAT:
+   - No meta-commentary or analysis
+   - Start directly with the formatted content
+   - Preserve all original content exactly
+   - Same rich formatting quality for all documents
 
 Text to convert:
 ---
@@ -216,53 +267,179 @@ Text to convert:
                 print(error_msg)
             return False, error_msg
     
+    def _is_bullet_point(self, line: str) -> bool:
+        """
+        Intelligently detect if a line is actually a bullet point.
+
+        Returns True only for actual list items like:
+        - item text
+        * item text
+        • item text
+
+        Returns False for:
+        **Name**: dialogue
+        *italic text*
+        --- separators
+        """
+        if not line:
+            return False
+
+        # Check for common bullet markers
+        if line.startswith('- ') or line.startswith('* ') or line.startswith('• '):
+            # Additional checks to avoid false positives
+            # Not a separator like "---" or "***"
+            if line.startswith('---') or line.startswith('***') or line.startswith('- -'):
+                return False
+            # Not dialogue/bold like "**Name**:"
+            if line.startswith('**') or (line.startswith('*') and ':' in line[:20]):
+                return False
+            # Not italic text like "*text*"
+            if line.startswith('*') and line.count('*') >= 2 and len(line) < 100:
+                return False
+            return True
+
+        return False
+
     def _detect_non_english_text(self, text: str) -> str:
         """Detect and italicize non-English and transliterated text."""
         import re
-        
+
         # Pattern for Sanskrit transliteration with diacritical marks
         diacritical_pattern = r'[āīūṛṝḷḹēōṃḥśṣṇḍṭñ]'
-        
+
         # Pattern for common non-Latin scripts
         non_latin_pattern = r'[\u0900-\u097F]|[\u0980-\u09FF]|[\u0A00-\u0A7F]|[\u0600-\u06FF]|[\u4E00-\u9FFF]|[\u3040-\u309F]|[\u30A0-\u30FF]'
-        
+
         # Check if text contains diacritical marks or non-Latin scripts
         if re.search(diacritical_pattern, text, re.IGNORECASE) or re.search(non_latin_pattern, text):
             # Check if it's not already italicized
             if not (text.startswith('*') and text.endswith('*')):
                 return f"*{text}*"
-        
+
         return text
     
-    def _simple_text_to_markdown(self, text_content: str) -> str:
-        """Simple fallback conversion from text to markdown."""
+    def _simple_text_to_markdown(self, text_content: str, is_first_chunk: bool = True) -> str:
+        """
+        Simple fallback conversion from text to markdown.
+
+        Args:
+            text_content: Text to convert
+            is_first_chunk: True if this is the first chunk in a multi-chunk document
+        """
         lines = text_content.split('\n')
         markdown_lines = []
         in_list = False
-        
+        in_sutra = False
+        # Only allow first heading to be H1 in the first chunk
+        first_heading_found = not is_first_chunk
+        h2_count = 0  # Track H2 headings after first H1
+
         for line in lines:
             stripped = line.strip()
-            
+
+            if self.debug and ('sutra' in stripped.lower() or 'यथा' in stripped or 'Yathâ' in stripped):
+                print(f"DEBUG LINE: {repr(stripped[:60])}, in_sutra={in_sutra}, h2_count={h2_count}")
+
             # Skip empty lines
             if not stripped:
                 markdown_lines.append('')
                 in_list = False
+                # Don't reset in_sutra on empty lines - wait for actual content
+                continue
+
+            # Separators end sutra mode
+            if stripped in ['---', '***', '___']:
+                markdown_lines.append(line)
+                in_sutra = False
+                in_list = False
                 continue
             
+            # Skip lines that already have markdown headings
+            if stripped.startswith('#'):
+                markdown_lines.append(line)
+                in_list = False
+                # Track if this is a Sutra heading
+                if 'sutra' in stripped.lower():
+                    in_sutra = True
+                    h2_count = 0  # Reset counter after Sutra
+                elif stripped.startswith('##'):
+                    h2_count += 1
+                    in_sutra = False
+            # Detect sutra text when in sutra mode
+            elif in_sutra:
+                # Clean up any existing markdown first (** and * mixed)
+                clean_text = stripped.replace('**', '').replace('*', '').strip()
+
+                if self.debug:
+                    print(f"DEBUG SUTRA: stripped={repr(stripped[:50])}, clean={repr(clean_text[:50])}")
+
+                # Check if this is sutra content (not a separator or heading)
+                if clean_text and not clean_text.startswith('#') and clean_text not in ['---', '***', '___']:
+                    # Check if it's Sanskrit, transliteration, or translation
+                    has_sanskrit = any('\u0900' <= c <= '\u097F' for c in clean_text)
+                    # Include macrons (ā), circumflex (â), dots below (ṭ), etc.
+                    has_diacritics = any(c in clean_text for c in ['ā', 'ī', 'ū', 'ṛ', 'ṝ', 'ḷ', 'ḹ', 'ē', 'ō', 'ṃ', 'ḥ', 'ś', 'ṣ', 'ṇ', 'ḍ', 'ṭ', 'ñ', 'â', 'î', 'û', 'ê', 'ô'])
+                    is_continuation = len(markdown_lines) > 0 and markdown_lines[-1].startswith('>')
+
+                    if self.debug:
+                        print(f"  sanskrit={has_sanskrit}, diacritics={has_diacritics}, continuation={is_continuation}")
+
+                    if has_sanskrit or has_diacritics or is_continuation:
+                        # Format as blockquote with italics for Sanskrit/transliteration
+                        if has_sanskrit or has_diacritics:
+                            markdown_lines.append(f"> *{clean_text}*")
+                            if self.debug:
+                                print(f"  -> Added blockquote with italics")
+                        else:
+                            # Translation (no italics for English translation)
+                            markdown_lines.append(f"> {clean_text}")
+                            if self.debug:
+                                print(f"  -> Added blockquote (translation)")
+                        in_list = False
+
+                        # After 3 sutra lines, exit sutra mode
+                        sutra_lines = [l for l in markdown_lines if l.startswith('>')]
+                        if len(sutra_lines) >= 3:
+                            in_sutra = False
+                            if self.debug:
+                                print(f"  -> Exiting sutra mode (3 lines collected)")
+                        continue
             # Detect potential headings (lines that are title-cased or all caps)
-            if (len(stripped) < 100 and 
-                (stripped.istitle() or stripped.isupper()) and 
-                not any(stripped.startswith(c) for c in ['-', '*', '•', '1', '2', '3'])):
-                # Check if it's a section or chapter
-                if any(word in stripped.lower() for word in ['section', 'part', 'chapter']):
-                    # Use H1 for sections and chapters
+            # Must be short, not contain sentence-ending punctuation, and not start with list markers
+            elif (len(stripped) < 100 and
+                (stripped.istitle() or stripped.isupper()) and
+                not any(stripped.startswith(c) for c in ['-', '*', '•', '1', '2', '3']) and
+                not stripped.endswith('.') and  # Not a sentence
+                not stripped.endswith('?') and
+                not stripped.endswith('!')):
+                # Use H1 (#) for:
+                # - First major heading (chapter/talk title)
+                # - Sections and chapters (keywords)
+                # Use H2 (##) for major sections
+                # Use H3 (###) for the first subsection after Sutra, then back to H2
+                if not first_heading_found or any(word in stripped.lower() for word in ['section', 'part', 'chapter', 'table of contents', 'contents', 'toc']):
+                    # Use H1 for first heading or major structural elements
                     markdown_lines.append(f"\n# {stripped}\n")
+                    first_heading_found = True
+                    h2_count = 0
+                elif h2_count == 0:
+                    # First major section after chapter title
+                    markdown_lines.append(f"\n## {stripped}\n")
+                    h2_count += 1
+                    # Set sutra mode if this is a Sutra heading
+                    if 'sutra' in stripped.lower():
+                        in_sutra = True
+                elif h2_count == 1:
+                    # Immediately after first H2 (Sutra), use H3 for narrative intro
+                    markdown_lines.append(f"\n### {stripped}\n")
+                    h2_count += 1
                 else:
-                    # Use H2 for other headings
+                    # Back to H2 for major sections
                     markdown_lines.append(f"\n## {stripped}\n")
                 in_list = False
-            # Detect list items
-            elif any(stripped.startswith(c) for c in ['-', '*', '•']):
+                in_sutra = False
+            # Detect list items (but not dialogue, italics, or separators)
+            elif self._is_bullet_point(stripped):
                 # Bullet list
                 markdown_lines.append(f"- {stripped[1:].strip()}")
                 in_list = True
@@ -365,7 +542,9 @@ Text to convert:
                 # Fallback to simple conversion for this chunk
                 if self.show_progress:
                     print(f"   ⚠️ Chunk {i+1} failed, using simple conversion")
-                markdown_chunks.append(self._simple_text_to_markdown(chunk))
+                # Only first chunk can have H1 headings
+                is_first_chunk = (i == 0)
+                markdown_chunks.append(self._simple_text_to_markdown(chunk, is_first_chunk=is_first_chunk))
         
         # Send completion notification for chunked processing
         if len(chunks) > 1:

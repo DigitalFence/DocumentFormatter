@@ -633,6 +633,9 @@ class DocumentConverter:
         
         # Track whether we've processed the first H1 as title
         self.first_h1_as_title = False
+
+        # Track whether this is a book (with title/TOC) or single chapter
+        self.is_book_with_title = False
         
         # Track hierarchical list context
         self.in_hierarchical_list = False
@@ -903,6 +906,45 @@ class DocumentConverter:
             if para_text.strip():
                 para = self.output_doc.add_paragraph(para_text.strip())
     
+    def _analyze_document_structure(self, elements):
+        """
+        Analyze document structure to determine if it's a complete book or single chapter.
+
+        A book has:
+        - Book title (first H1)
+        - Table of Contents (H1 with TOC/Contents)
+        - Multiple chapters (multiple H1s)
+
+        A single chapter has:
+        - Chapter title (only H1)
+        - Sections (H2+)
+        - No TOC
+        """
+        h1_elements = [el for el in elements if el.name == 'h1']
+        h1_count = len(h1_elements)
+
+        # Check for TOC
+        has_toc = False
+        for el in h1_elements:
+            text = el.get_text().strip().lower()
+            if text in ['contents', 'table of contents', 'toc'] or 'table of contents' in text:
+                has_toc = True
+                break
+
+        # Determine if this is a book:
+        # - Has 3+ H1s (title, TOC, chapter(s))
+        # - OR has TOC and 2+ H1s
+        if h1_count >= 3 or (has_toc and h1_count >= 2):
+            self.is_book_with_title = True
+            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                print(f"DEBUG: Detected BOOK structure (H1 count: {h1_count}, has TOC: {has_toc})")
+                print(f"DEBUG: First H1 will use Title style")
+        else:
+            self.is_book_with_title = False
+            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                print(f"DEBUG: Detected SINGLE CHAPTER structure (H1 count: {h1_count}, has TOC: {has_toc})")
+                print(f"DEBUG: First H1 will use Heading 1 style")
+
     def _process_markdown_content(self, content: str):
         """Process markdown content to Word format."""
         # First, handle any explicit page break markers
@@ -949,7 +991,10 @@ class DocumentConverter:
         
         # Track when we're at the end of a chapter for separator placement
         self.current_chapter_started = False
-        
+
+        # Analyze document structure to determine if it's a book or single chapter
+        self._analyze_document_structure(all_elements)
+
         # Process each element
         for idx, element in enumerate(all_elements):
             # Check if the next element is a new chapter to add separator before it
@@ -995,15 +1040,19 @@ class DocumentConverter:
         if element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
             level = int(element.name[1])
             
-            # Handle first H1 as Title
-            if element.name == 'h1' and not self.first_h1_as_title:
+            # Handle first H1 as Title only for books (with TOC and multiple chapters)
+            if element.name == 'h1' and not self.first_h1_as_title and self.is_book_with_title:
                 use_title_style = True
                 level = 0  # Treat as title level
                 self.first_h1_as_title = True
                 if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                    print(f"DEBUG: First H1 converted to document title: '{element.get_text().strip()}'")
+                    print(f"DEBUG: First H1 converted to document title (book): '{element.get_text().strip()}'")
             else:
                 use_title_style = False
+                if element.name == 'h1' and not self.first_h1_as_title:
+                    self.first_h1_as_title = True
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: First H1 kept as Heading 1 (single chapter): '{element.get_text().strip()}'")
             
             heading_text = element.get_text().strip()
             
