@@ -50,6 +50,12 @@ except ImportError:
     # If config_loader is not available, create a dummy
     FormatterConfig = None
 
+try:
+    from striprtf.striprtf import rtf_to_text
+    RTF_SUPPORT = True
+except ImportError:
+    RTF_SUPPORT = False
+
 
 class StyleExtractor:
     """Extracts formatting styles from a reference Word document."""
@@ -627,6 +633,9 @@ class DocumentConverter:
         
         # Track whether we've processed the first H1 as title
         self.first_h1_as_title = False
+
+        # Track whether this is a book (with title/TOC) or single chapter
+        self.is_book_with_title = False
         
         # Track hierarchical list context
         self.in_hierarchical_list = False
@@ -640,6 +649,10 @@ class DocumentConverter:
             'preface': False,
             'foreword': False
         }
+
+        # Track if we're currently in TOC section (to keep heading and content together)
+        self.in_toc_section = False
+        self.toc_content_started = False
     
     def _clear_template_content(self):
         """Clear all content from the template document while preserving styles."""
@@ -667,10 +680,10 @@ class DocumentConverter:
         if text_lower in ['contents', 'table of contents', 'toc'] or 'table of contents' in text_lower:
             return 'contents'
         
-        if text_lower == 'preface' or text_lower.startswith('preface'):
+        if text_lower == 'preface':
             return 'preface'
         
-        if text_lower == 'foreword' or text_lower.startswith('foreword'):
+        if text_lower == 'foreword':
             return 'foreword'
         
         return None
@@ -844,10 +857,21 @@ class DocumentConverter:
         """Convert input document to styled Word document."""
         # Resolve any aliases or symlinks
         input_path = Path(resolve_path(input_path))
-        
+
         # Determine file type and read content
         if input_path.suffix.lower() == '.txt':
             content = self._read_text_file(input_path)
+            self._process_text_content(content)
+        elif input_path.suffix.lower() == '.rtf':
+            if not RTF_SUPPORT:
+                raise ValueError("RTF support requires striprtf library. Install with: pip install striprtf")
+            # Read RTF and convert to plain text
+            print(f"Converting RTF to plain text...")
+            with open(input_path, 'r', encoding='utf-8') as f:
+                rtf_content = f.read()
+            content = rtf_to_text(rtf_content)
+            print(f"Extracted {len(content)} characters from RTF")
+            # Process as text content (striprtf gives us plain text)
             self._process_text_content(content)
         elif input_path.suffix.lower() in ['.md', '.markdown']:
             content = self._read_markdown_file(input_path)
@@ -882,6 +906,45 @@ class DocumentConverter:
             if para_text.strip():
                 para = self.output_doc.add_paragraph(para_text.strip())
     
+    def _analyze_document_structure(self, elements):
+        """
+        Analyze document structure to determine if it's a complete book or single chapter.
+
+        A book has:
+        - Book title (first H1)
+        - Table of Contents (H1 with TOC/Contents)
+        - Multiple chapters (multiple H1s)
+
+        A single chapter has:
+        - Chapter title (only H1)
+        - Sections (H2+)
+        - No TOC
+        """
+        h1_elements = [el for el in elements if el.name == 'h1']
+        h1_count = len(h1_elements)
+
+        # Check for TOC
+        has_toc = False
+        for el in h1_elements:
+            text = el.get_text().strip().lower()
+            if text in ['contents', 'table of contents', 'toc'] or 'table of contents' in text:
+                has_toc = True
+                break
+
+        # Determine if this is a book:
+        # - Has 3+ H1s (title, TOC, chapter(s))
+        # - OR has TOC and 2+ H1s
+        if h1_count >= 3 or (has_toc and h1_count >= 2):
+            self.is_book_with_title = True
+            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                print(f"DEBUG: Detected BOOK structure (H1 count: {h1_count}, has TOC: {has_toc})")
+                print(f"DEBUG: First H1 will use Title style")
+        else:
+            self.is_book_with_title = False
+            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                print(f"DEBUG: Detected SINGLE CHAPTER structure (H1 count: {h1_count}, has TOC: {has_toc})")
+                print(f"DEBUG: First H1 will use Heading 1 style")
+
     def _process_markdown_content(self, content: str):
         """Process markdown content to Word format."""
         # First, handle any explicit page break markers
@@ -928,7 +991,10 @@ class DocumentConverter:
         
         # Track when we're at the end of a chapter for separator placement
         self.current_chapter_started = False
-        
+
+        # Analyze document structure to determine if it's a book or single chapter
+        self._analyze_document_structure(all_elements)
+
         # Process each element
         for idx, element in enumerate(all_elements):
             # Check if the next element is a new chapter to add separator before it
@@ -974,15 +1040,19 @@ class DocumentConverter:
         if element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
             level = int(element.name[1])
             
-            # Handle first H1 as Title
-            if element.name == 'h1' and not self.first_h1_as_title:
+            # Handle first H1 as Title only for books (with TOC and multiple chapters)
+            if element.name == 'h1' and not self.first_h1_as_title and self.is_book_with_title:
                 use_title_style = True
                 level = 0  # Treat as title level
                 self.first_h1_as_title = True
                 if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                    print(f"DEBUG: First H1 converted to document title: '{element.get_text().strip()}'")
+                    print(f"DEBUG: First H1 converted to document title (book): '{element.get_text().strip()}'")
             else:
                 use_title_style = False
+                if element.name == 'h1' and not self.first_h1_as_title:
+                    self.first_h1_as_title = True
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: First H1 kept as Heading 1 (single chapter): '{element.get_text().strip()}'")
             
             heading_text = element.get_text().strip()
             
@@ -1007,13 +1077,20 @@ class DocumentConverter:
                     
                     # Add separator at end of previous chapter if we were in one
                     if self.current_chapter_started:
-                        separator_settings = self.config.get_chapter_separator()
-                        if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
-                            self._add_chapter_separator(separator_settings)
-                            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                                print(f"DEBUG: Added chapter separator at end of '{self.current_chapter_name}' before starting '{heading_text}'")
-                            else:
-                                print(f"Added separator at end of chapter: {self.current_chapter_name}")
+                        # Skip separator after intro sections (TOC, Preface) - they're not content chapters
+                        if ('table of contents' not in self.current_chapter_name.lower() and 
+                            'contents' != self.current_chapter_name.lower() and 
+                            'toc' != self.current_chapter_name.lower() and
+                            'preface' != self.current_chapter_name.lower()):
+                            separator_settings = self.config.get_chapter_separator()
+                            if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
+                                self._add_chapter_separator(separator_settings)
+                                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                                    print(f"DEBUG: Added chapter separator at end of '{self.current_chapter_name}' before starting '{heading_text}'")
+                                else:
+                                    print(f"Added separator at end of chapter: {self.current_chapter_name}")
+                        elif os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Skipped separator after intro section: '{self.current_chapter_name}'")
                     
                     # Simple rule: Always add page break before chapters (H1 headings)
                     if len(self.output_doc.paragraphs) > 0:
@@ -1060,20 +1137,53 @@ class DocumentConverter:
             if use_title_style:
                 special_section = 'title'
             
-            # Add page break BEFORE special sections (except title)
-            # Contents should have its own page break before it
-            if special_section and special_section != 'title' and len(self.output_doc.paragraphs) > 0:
-                self.output_doc.add_page_break()
-                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                    print(f"DEBUG: Added page break BEFORE {special_section} section")
-                else:
-                    print(f"Added page break before {special_section}")
+            # Special section page breaks are handled in paragraph processing, not for headings
+            # Headings get their page breaks from heading/chapter logic
             
+            # Check if exiting TOC section (new major heading encountered)
+            if self.in_toc_section and self.toc_content_started:
+                # End of TOC section detected, add deferred page break
+                if self.config and self.config.should_add_page_break_after_contents():
+                    self.output_doc.add_page_break()
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: Added deferred page break after TOC content")
+                self.in_toc_section = False
+                self.toc_content_started = False
+
             # Add the heading or title
             if use_title_style or special_section == 'title':
                 # Use Title style instead of heading
                 heading = self.output_doc.add_paragraph(heading_text)
                 heading.style = 'Title'
+
+                # Apply Title style overrides from configuration
+                if self.config and hasattr(self.config, 'get_style_override'):
+                    title_override = self.config.get_style_override('Title')
+                    if title_override:
+                        # Apply font properties to all runs
+                        for run in heading.runs:
+                            if 'font_name' in title_override and title_override['font_name'] is not None:
+                                run.font.name = title_override['font_name']
+                            if 'font_size' in title_override and title_override['font_size'] is not None:
+                                run.font.size = Pt(title_override['font_size'])
+                            if 'italic' in title_override and title_override['italic'] is not None:
+                                run.italic = title_override['italic']
+                            if 'bold' in title_override and title_override['bold'] is not None:
+                                run.bold = title_override['bold']
+
+                        # Apply paragraph formatting
+                        if 'alignment' in title_override:
+                            alignment_map = {
+                                'left': WD_ALIGN_PARAGRAPH.LEFT,
+                                'center': WD_ALIGN_PARAGRAPH.CENTER,
+                                'right': WD_ALIGN_PARAGRAPH.RIGHT,
+                                'justify': WD_ALIGN_PARAGRAPH.JUSTIFY
+                            }
+                            if title_override['alignment'] in alignment_map:
+                                heading.alignment = alignment_map[title_override['alignment']]
+                        if 'line_spacing' in title_override and title_override['line_spacing'] is not None:
+                            heading.paragraph_format.line_spacing = title_override['line_spacing']
+
                 # Mark as special section if detected
                 if special_section:
                     self._handle_special_section_page_break(special_section)
@@ -1083,8 +1193,8 @@ class DocumentConverter:
                 if special_section:
                     self._handle_special_section_page_break(special_section)
             
-            # Apply heading overrides from configuration if style overrides are enabled
-            if self.config and self.use_config and self.style_extractor:
+            # Apply heading overrides from configuration if available
+            if self.config and hasattr(self.config, 'get_heading_override'):
                 override = self.config.get_heading_override(word_heading_level)
                 if override:
                     # Apply alignment
@@ -1101,13 +1211,13 @@ class DocumentConverter:
                     # Apply font properties to all runs
                     for run in heading.runs:
                         # First apply reference document font if available
-                        if 'headings' in self.style_extractor.styles:
+                        if self.style_extractor and hasattr(self.style_extractor, 'styles') and 'headings' in self.style_extractor.styles:
                             heading_style_name = f'Heading {word_heading_level}'
                             if heading_style_name in self.style_extractor.styles['headings']:
                                 ref_style = self.style_extractor.styles['headings'][heading_style_name]
                                 if 'font' in ref_style and ref_style['font'].get('name'):
                                     run.font.name = ref_style['font']['name']
-                        
+
                         # Then apply overrides (only if explicitly set, not None)
                         if 'italic' in override and override['italic'] is not None:
                             run.italic = override['italic']
@@ -1117,7 +1227,13 @@ class DocumentConverter:
                             run.font.name = override['font_name']
                         if 'font_size' in override and override['font_size'] is not None:
                             run.font.size = Pt(override['font_size'])
-                    
+
+                    # Apply paragraph spacing overrides
+                    if 'space_before' in override and override['space_before'] is not None:
+                        heading.paragraph_format.space_before = Pt(override['space_before'])
+                    if 'space_after' in override and override['space_after'] is not None:
+                        heading.paragraph_format.space_after = Pt(override['space_after'])
+
                     # Note: Other formatting from template is preserved unless overridden
                 else:
                     # No override - template styles are used
@@ -1136,10 +1252,12 @@ class DocumentConverter:
                       self.config.should_add_page_break_after_dedication()):
                     self.output_doc.add_page_break()
                 
-                # Check for Contents page break
-                elif (hasattr(self.config, 'is_contents_keyword') and self.config.is_contents_keyword(heading_text) and 
-                      self.config.should_add_page_break_after_contents()):
-                    self.output_doc.add_page_break()
+                # Check for Contents - mark section but defer page break until after content
+                elif (hasattr(self.config, 'is_contents_keyword') and self.config.is_contents_keyword(heading_text)):
+                    self.in_toc_section = True
+                    self.toc_content_started = False
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: Entered TOC section, deferring page break until after content")
             
             # Check if this heading introduces a hierarchical list section
             if self.config:
@@ -1189,9 +1307,11 @@ class DocumentConverter:
                     bq_settings = self.config.get_blockquote_settings()
                     center_align = bq_settings.get('center_align', True)
                     remove_em_dashes = bq_settings.get('remove_em_dashes', True)
+                    force_italic = bq_settings.get('italic', False)
                 else:
                     center_align = True
                     remove_em_dashes = True
+                    force_italic = False
                 
                 # Check if this is a chapter opening quote
                 is_opening_quote = False
@@ -1319,6 +1439,11 @@ class DocumentConverter:
                         run.style = 'Emphasis'
                     if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                         print(f"DEBUG: Applied Emphasis character style to chapter opening quote blockquote")
+
+                # Apply italic formatting to all blockquote runs if configured
+                if force_italic and not is_opening_quote:
+                    for run in para.runs:
+                        run.italic = True
                 
                 # Track this element for chapter end detection
                 if self.current_chapter_started:
@@ -1332,7 +1457,13 @@ class DocumentConverter:
             text = element.get_text().strip()
             if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                 print(f"DEBUG: Processing paragraph element: '{text[:50]}...'")
-            
+
+            # Check if we're in TOC section and this is TOC content
+            if self.in_toc_section and text and not self.toc_content_started:
+                self.toc_content_started = True
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: TOC content started")
+
             # Check for page break placeholder
             if '<!--PAGEBREAK-->' in str(element):
                 if self.config and self.config.should_preserve_original_page_breaks():
@@ -1439,7 +1570,17 @@ class DocumentConverter:
                             style_names = [style.name for style in self.output_doc.styles]
                             if bullet_style in style_names:
                                 para.style = bullet_style
-                            
+
+                            # Apply Normal style overrides (including Aptos Light font) to list items
+                            if self.config and hasattr(self.config, 'get_style_override'):
+                                normal_override = self.config.get_style_override('Normal')
+                                if normal_override and para.runs:
+                                    for run in para.runs:
+                                        if 'font_name' in normal_override and normal_override['font_name'] is not None:
+                                            run.font.name = normal_override['font_name']
+                                        if 'font_size' in normal_override and normal_override['font_size'] is not None:
+                                            run.font.size = Pt(normal_override['font_size'])
+
                             if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                                 print(f"DEBUG: Applied tab indentation to bullet point: '{bullet_text[:30]}...'")
                     else:
@@ -1578,12 +1719,28 @@ class DocumentConverter:
                 # Determine the Word heading level using configuration
                 word_heading_level = level
                 use_title_style = False
-                
+
+                # Check if exiting TOC section (new major heading encountered)
+                if self.in_toc_section and self.toc_content_started:
+                    # End of TOC section detected, add deferred page break
+                    if self.config and self.config.should_add_page_break_after_contents():
+                        self.output_doc.add_page_break()
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Added deferred page break after TOC content (Word doc path)")
+                    self.in_toc_section = False
+                    self.toc_content_started = False
+
                 if self.config:
                     # Check if this is a title
                     if hasattr(self.config, 'is_title_keyword') and self.config.is_title_keyword(heading_text):
                         use_title_style = True
                         word_heading_level = 0
+                    # Check if this is TOC heading
+                    elif hasattr(self.config, 'is_contents_keyword') and self.config.is_contents_keyword(heading_text):
+                        self.in_toc_section = True
+                        self.toc_content_started = False
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Entered TOC section (Word doc path), deferring page break")
                     # Check if this is a section (use Heading 1)
                     elif self.config.is_section_keyword(heading_text):
                         word_heading_level = 1
@@ -1645,11 +1802,39 @@ class DocumentConverter:
                     # Use Title style instead of heading
                     heading = self.output_doc.add_paragraph(heading_text)
                     heading.style = 'Title'
+
+                    # Apply Title style overrides from configuration
+                    if self.config and hasattr(self.config, 'get_style_override'):
+                        title_override = self.config.get_style_override('Title')
+                        if title_override:
+                            # Apply font properties to all runs
+                            for run in heading.runs:
+                                if 'font_name' in title_override and title_override['font_name'] is not None:
+                                    run.font.name = title_override['font_name']
+                                if 'font_size' in title_override and title_override['font_size'] is not None:
+                                    run.font.size = Pt(title_override['font_size'])
+                                if 'italic' in title_override and title_override['italic'] is not None:
+                                    run.italic = title_override['italic']
+                                if 'bold' in title_override and title_override['bold'] is not None:
+                                    run.bold = title_override['bold']
+
+                            # Apply paragraph formatting
+                            if 'alignment' in title_override:
+                                alignment_map = {
+                                    'left': WD_ALIGN_PARAGRAPH.LEFT,
+                                    'center': WD_ALIGN_PARAGRAPH.CENTER,
+                                    'right': WD_ALIGN_PARAGRAPH.RIGHT,
+                                    'justify': WD_ALIGN_PARAGRAPH.JUSTIFY
+                                }
+                                if title_override['alignment'] in alignment_map:
+                                    heading.alignment = alignment_map[title_override['alignment']]
+                            if 'line_spacing' in title_override and title_override['line_spacing'] is not None:
+                                heading.paragraph_format.line_spacing = title_override['line_spacing']
                 else:
                     heading = self.output_doc.add_heading(heading_text, level=word_heading_level)
                 
                 # Apply heading overrides from configuration if available
-                if self.config:
+                if self.config and hasattr(self.config, 'get_heading_override'):
                     override = self.config.get_heading_override(word_heading_level)
                     if override:
                         # Apply alignment
@@ -1662,17 +1847,23 @@ class DocumentConverter:
                             }
                             if override['alignment'] in alignment_map:
                                 heading.alignment = alignment_map[override['alignment']]
-                        
+
                         # Apply font properties to all runs
                         for run in heading.runs:
-                            if 'italic' in override:
+                            if 'italic' in override and override['italic'] is not None:
                                 run.italic = override['italic']
-                            if 'bold' in override:
+                            if 'bold' in override and override['bold'] is not None:
                                 run.bold = override['bold']
-                            if 'font_name' in override:
+                            if 'font_name' in override and override['font_name'] is not None:
                                 run.font.name = override['font_name']
-                            if 'font_size' in override:
+                            if 'font_size' in override and override['font_size'] is not None:
                                 run.font.size = Pt(override['font_size'])
+
+                        # Apply paragraph spacing overrides
+                        if 'space_before' in override and override['space_before'] is not None:
+                            heading.paragraph_format.space_before = Pt(override['space_before'])
+                        if 'space_after' in override and override['space_after'] is not None:
+                            heading.paragraph_format.space_after = Pt(override['space_after'])
             
             # Process lists
             elif para.style and para.style.name and ('List' in para.style.name or 'Bullet' in para.style.name):
@@ -1699,6 +1890,12 @@ class DocumentConverter:
             
             # Process regular paragraphs
             else:
+                # Check if we're in TOC section and this is TOC content
+                if self.in_toc_section and para.text.strip() and not self.toc_content_started:
+                    self.toc_content_started = True
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: TOC content started (Word doc path)")
+
                 new_para = self.output_doc.add_paragraph()
                 
                 # Check if this is a blockquote (indented paragraph with specific formatting)
@@ -1713,9 +1910,12 @@ class DocumentConverter:
                         new_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     new_para.paragraph_format.space_before = Pt(12)
                     new_para.paragraph_format.space_after = Pt(12)
-                
+                    force_italic_bq = bq_settings.get('italic', False)
+                else:
+                    force_italic_bq = False
+
                 # Copy paragraph alignment if not a blockquote
-                elif para.alignment is not None and not is_blockquote:
+                if para.alignment is not None and not is_blockquote:
                     new_para.alignment = para.alignment
                 
                 # Copy runs with formatting
@@ -1729,7 +1929,7 @@ class DocumentConverter:
                     
                     new_run = new_para.add_run(text)
                     new_run.bold = run.bold
-                    new_run.italic = run.italic
+                    new_run.italic = run.italic if not force_italic_bq else True
                     new_run.underline = run.underline
                     if run.font.color and run.font.color.rgb:
                         new_run.font.color.rgb = run.font.color.rgb
@@ -1769,14 +1969,15 @@ class DocumentConverter:
     
     def _apply_reference_styles(self):
         """Apply styles from reference document to output document."""
-        # Only apply if we're using config (otherwise template styles are already in place)
-        if not self.use_config or not self.style_extractor:
-            return
-        
-        styles = self.style_extractor.styles
-        
-        # Apply document-level styles
-        if 'document' in styles and 'margins' in styles['document']:
+        # Apply reference styles if style extractor is available
+        if self.use_config and self.style_extractor:
+            styles = self.style_extractor.styles
+        else:
+            styles = None
+
+
+        # Apply document-level styles from reference if available
+        if styles and 'document' in styles and 'margins' in styles['document']:
             section = self.output_doc.sections[0]
             margins = styles['document']['margins']
             if margins['top']:
@@ -1787,16 +1988,46 @@ class DocumentConverter:
                 section.left_margin = margins['left']
             if margins['right']:
                 section.right_margin = margins['right']
-        
-        # Apply normal style
-        if 'normal' in styles and styles['normal']:
+
+        # Apply normal style from reference if available
+        if styles and 'normal' in styles and styles['normal']:
             normal_style = styles['normal']
             for para in self.output_doc.paragraphs:
                 if para.style.name == 'Normal':
                     self._apply_paragraph_style(para, normal_style)
+
+        # ALWAYS apply Normal style overrides from configuration if config exists
+        if self.config and hasattr(self.config, 'get_style_override'):
+            normal_override = self.config.get_style_override('Normal')
+            if normal_override:
+                for para in self.output_doc.paragraphs:
+                    if para.style.name == 'Normal':
+                        # Apply font properties to all runs
+                        for run in para.runs:
+                            if 'font_name' in normal_override and normal_override['font_name'] is not None:
+                                run.font.name = normal_override['font_name']
+                            if 'font_size' in normal_override and normal_override['font_size'] is not None:
+                                run.font.size = Pt(normal_override['font_size'])
+                            if 'italic' in normal_override and normal_override['italic'] is not None:
+                                run.italic = normal_override['italic']
+                            if 'bold' in normal_override and normal_override['bold'] is not None:
+                                run.bold = normal_override['bold']
+
+                        # Apply paragraph formatting
+                        if 'line_spacing' in normal_override and normal_override['line_spacing'] is not None:
+                            para.paragraph_format.line_spacing = normal_override['line_spacing']
+                        if 'alignment' in normal_override:
+                            alignment_map = {
+                                'left': WD_ALIGN_PARAGRAPH.LEFT,
+                                'center': WD_ALIGN_PARAGRAPH.CENTER,
+                                'right': WD_ALIGN_PARAGRAPH.RIGHT,
+                                'justify': WD_ALIGN_PARAGRAPH.JUSTIFY
+                            }
+                            if normal_override['alignment'] in alignment_map:
+                                para.alignment = alignment_map[normal_override['alignment']]
         
-        # Apply heading styles
-        if 'headings' in styles:
+        # Apply heading styles from reference if available
+        if styles and 'headings' in styles:
             for para in self.output_doc.paragraphs:
                 if para.style and 'Heading' in para.style.name:
                     if para.style.name in styles['headings']:

@@ -6,6 +6,27 @@ This document details the AI-powered enhancements to the Word Formatter, includi
 
 The AI enhancement uses Claude in headless mode to intelligently analyze and structure plain text files before applying Word formatting. This dramatically improves the quality of text file conversion by adding semantic understanding.
 
+**Key Feature: Adaptive Document Type Detection**
+The system automatically detects whether a document is:
+- A **complete book** (with title, TOC, and multiple chapters)
+- A **single chapter** (just one chapter/talk without TOC)
+
+**Critical principle:** Chapters use IDENTICAL formatting whether in a book or standalone.
+
+**Book structure (Markdown → Word):**
+- `# Book Title` → Title style (largest font)
+- `# Table of Contents` → Heading 2
+- `# Chapter 1: Name` → Heading 2
+- `## Section` → Heading 3
+- `### Subsection` → Heading 4
+
+**Single chapter structure (Markdown → Word):**
+- `# Talk 13: Love That Dares` → Heading 2 (same as chapters in books)
+- `## Section` → Heading 3 (same as in books)
+- `### Subsection` → Heading 4 (same as in books)
+
+**Key principle:** Chapters use **Heading 2** in Word (whether in a book or standalone). The only difference is books have a Title before chapters.
+
 ## Architecture
 
 ```
@@ -92,20 +113,28 @@ def safe_claude_convert(text_content):
 ```
 You are a document formatting assistant. Convert the provided plain text into well-structured markdown format.
 
+STEP 1: DETECT DOCUMENT TYPE
+First, analyze the document structure to determine its type:
+- BOOK/MULTI-CHAPTER: Has title, TOC, multiple chapters, or clear chapter divisions
+- SIMPLE ARTICLE/ESSAY: Single cohesive piece without chapter structure or TOC
+
+STEP 2: APPLY APPROPRIATE FORMATTING
 Instructions:
-1. Identify and mark headings based on context and formatting cues
-2. Detect lists (both bulleted and numbered) and format appropriately
-3. Recognize quotes, citations, and special blocks
-4. Preserve all original text content exactly
-5. Add markdown formatting only where it enhances structure
-6. Use heading levels (# ## ###) based on document hierarchy
-7. Format code blocks if you detect code snippets
-8. Identify tables and convert to markdown table format
+1. Identify and mark headings based on context and document type
+2. For BOOKS: Use # (H1) for title/TOC/chapters, ## (H2) for sections
+3. For ARTICLES: Use ## (H2) for main sections, ### (H3) for subsections
+4. Detect lists (both bulleted and numbered) and format appropriately
+5. Recognize quotes, citations, and special blocks
+6. Preserve all original text content exactly
+7. Add markdown formatting only where it enhances structure
+8. Format code blocks if you detect code snippets
+9. Identify tables and convert to markdown table format
 
 Important:
 - Do not add any content that wasn't in the original
 - Maintain the original tone and style
 - Focus on structure, not rewriting
+- Match formatting style to actual document structure
 
 Return only the markdown formatted text, no explanations.
 ```

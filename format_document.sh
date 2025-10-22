@@ -104,6 +104,7 @@ for file in "$@"; do
         claude_path=""
         claude_locations=(
             "claude"                                    # Check PATH first
+            "$HOME/.claude/local/claude"               # Claude Code install
             "/usr/local/bin/claude"                     # Homebrew Intel
             "/opt/homebrew/bin/claude"                  # Homebrew Apple Silicon
             "/usr/bin/claude"                          # System install
@@ -151,33 +152,34 @@ for file in "$@"; do
                 send_notification "Word Formatter" "Error ✗" "AI conversion failed for $filename, check logs" "Basso"
             fi
         else
-            echo "WARNING: Claude CLI not found in any common location, using simple converter"
+            echo "WARNING: Claude CLI not found in any common location"
             echo "PATH: $PATH"
             echo "Searched locations:"
             for location in "${claude_locations[@]}"; do
                 echo "  - $location: $([ -x "$location" ] && echo "exists but not executable" || echo "not found")"
             done
-            
+            echo "Using AI converter with fallback to simple text-to-markdown conversion..."
+
             # Send notification for fallback to simple conversion
             filename=$(basename "$file")
             send_notification "Word Formatter" "Fallback Mode" "Claude AI not available, using simple conversion for $filename" "Submarine"
-            
+
             # Enable debug logging
             export WORD_FORMATTER_DEBUG=1
-            
-            # Note: document_converter_simple.py doesn't support config yet
-            # Using document_converter.py instead for consistency
+
+            # Still use AI converter - it has fallback logic for when Claude is not available
+            # This ensures RTF/TXT files get proper markdown structure detection
             if [ -n "$CONFIG_FILE" ]; then
-                python "$SCRIPT_DIR/document_converter.py" --input "$file" --reference "$REFERENCE_FORMAT" --config "$CONFIG_FILE"
+                python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" --config "$CONFIG_FILE" "$file"
             else
-                python "$SCRIPT_DIR/document_converter.py" --input "$file" --reference "$REFERENCE_FORMAT"
+                python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" "$file"
             fi
             converter_exit_code=$?
-            echo "Simple converter exit code: $converter_exit_code"
-            
+            echo "AI converter (fallback mode) exit code: $converter_exit_code"
+
             # Send completion notification for simple conversion
             if [ $converter_exit_code -eq 0 ]; then
-                send_notification "Word Formatter" "Conversion Complete" "$filename converted successfully (simple mode)" "Hero"
+                send_notification "Word Formatter" "Conversion Complete" "$filename converted successfully (fallback mode)" "Hero"
             else
                 send_notification "Word Formatter" "Error ✗" "Conversion failed for $filename" "Basso"
             fi

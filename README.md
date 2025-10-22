@@ -5,16 +5,21 @@ An intelligent document formatter that converts text, markdown, and Word documen
 ## Features
 
 - **Multiple Input Formats**: Supports `.txt`, `.rtf`, `.md`, `.markdown`, `.docx`, and `.doc` files
+- **RTF File Support**: Native RTF processing with intelligent text extraction
 - **Smart Style Matching**: Automatically extracts and applies formatting from a reference Word document
-- **AI-Enhanced Text Processing**: Uses Claude AI to intelligently structure plain text files
+- **AI-Enhanced Text Processing**: Uses Claude AI to intelligently structure plain text and RTF files
+- **Professional Typography**: Comprehensive Aptos Light font styling with configurable sizes
+- **Style Override System**: Direct control over fonts, sizes, and spacing for all styles
 - **Finder Integration**: Right-click any document in macOS Finder to format instantly
 - **System Notifications**: Real-time notifications for processing stages and completion
 - **Preserves Content**: Maintains all original content while upgrading formatting
 - **External Configuration**: JSON-based configuration for custom formatting rules
+- **Intelligent Page Breaks**: Separate pages for Title, Dedication, and Table of Contents
 - **macOS Alias Support**: Works with alias files for reference documents
-- **Flexible Heading Styles**: Template-based or custom heading formatting
+- **Flexible Heading Styles**: Template-based or custom heading formatting with Aptos Light
 - **Advanced Document Structure**: Support for sections, chapters, and multi-level headings
 - **Full Word Document Support**: Process existing Word documents with style preservation
+- **Multilingual Support**: Automatic italic formatting for non-English text and quotes
 
 ## Installation
 
@@ -107,17 +112,36 @@ Create a `formatter_config.json` file:
 
 ```json
 {
-  "heading_overrides": {
-    "heading_3": {
-      "alignment": "center",
-      "italic": false,
-      "bold": null,
-      "font_name": null,
-      "font_size": null
+  "style_overrides": {
+    "Normal": {
+      "font_name": "Aptos Light",
+      "font_size": 12.0,
+      "line_spacing": 1.4
     },
-    "heading_4": {
-      "alignment": "left", 
-      "italic": true
+    "Title": {
+      "font_name": "Aptos Light",
+      "font_size": 48.0
+    },
+    "Subtitle": {
+      "font_name": "Aptos Light",
+      "font_size": 36.0
+    }
+  },
+  "heading_overrides": {
+    "heading_1": {
+      "font_name": "Aptos Light",
+      "font_size": 16.0,
+      "alignment": "center"
+    },
+    "heading_2": {
+      "font_name": "Aptos Light",
+      "font_size": 15.0,
+      "alignment": "center"
+    },
+    "heading_3": {
+      "font_name": "Aptos Light",
+      "font_size": 13.5,
+      "alignment": "center"
     }
   },
   "heading_detection": {
@@ -127,22 +151,34 @@ Create a `formatter_config.json` file:
   },
   "page_breaks": {
     "before_sections": false,
-    "before_chapters": true
+    "before_chapters": true,
+    "after_title": true,
+    "after_dedication": true,
+    "after_contents": true
   },
   "blockquote_formatting": {
     "remove_em_dashes": true,
     "single_line_spacing": true,
-    "center_align": true
+    "center_align": true,
+    "italic": true
   }
 }
 ```
 
 #### Configuration Options
 
+**Style Overrides (New!):**
+- `Normal`: Configure body text font, size, and line spacing
+- `Title`: Set title font and size
+- `Subtitle`: Configure subtitle font and size
+- Properties: `font_name`, `font_size`, `line_spacing`
+- Always applied when configuration exists
+
 **Heading Overrides:**
 - Set any property to `null` to use template defaults
-- Available properties: `alignment` (left/center/right/justify), `italic`, `bold`, `font_name`, `font_size`
+- Available properties: `font_name`, `font_size`, `alignment` (left/center/right/justify), `italic`, `bold`
 - Supports heading_1 through heading_6
+- Recommended: Use Aptos Light for consistent typography
 
 **Heading Detection:**
 - `section_keywords`: Words that identify section headings (use Heading 1)
@@ -150,12 +186,17 @@ Create a `formatter_config.json` file:
 - `always_use_heading_2_for_chapters`: Ensures chapters always use Heading 2
 
 **Page Breaks:**
-- Control when page breaks are inserted before sections and chapters
+- `before_sections`: Insert page break before section headings
+- `before_chapters`: Insert page break before chapter headings
+- `after_title`: Page break after title (separate title page)
+- `after_dedication`: Page break after dedication
+- `after_contents`: Page break after table of contents
 
 **Blockquote Formatting:**
 - `remove_em_dashes`: Remove em dashes (—) from citations
 - `single_line_spacing`: Use single line breaks in blockquotes
 - `center_align`: Center-align blockquote content
+- `italic`: Format all blockquotes in italics (recommended for quotes)
 
 #### Document Structure
 
@@ -426,9 +467,58 @@ cp formatter_config.json my_config.json
 python document_converter.py --input doc.md --reference template.docx --config my_config.json
 ```
 
-## Recent Changes (2025-09-03)
+## Recent Changes (2025-10-21)
 
-### New Features
+### Latest Features
+
+1. **Comprehensive Aptos Light Font Styling**
+   - All text styles now support Aptos Light font family
+   - Configurable font sizes for all heading levels
+   - Professional typography with consistent font usage across document
+   - List paragraph styles inherit font configuration
+   - Style overrides system for precise control
+
+2. **Enhanced RTF File Support**
+   - Native RTF file format processing
+   - Automatic text extraction and structure detection
+   - Claude AI integration for intelligent RTF conversion
+   - Preserves document content while applying modern formatting
+
+3. **Advanced Style Override System**
+   - New `style_overrides` configuration section
+   - Direct control over Normal, Title, and Subtitle styles
+   - Font name, size, and line spacing configuration
+   - Heading font overrides for all levels (H1-H6)
+   - Always applies when configuration exists (no environment variable needed)
+
+4. **Professional Typography Settings**
+   - **Title**: 48pt Aptos Light
+   - **Subtitle**: 36pt Aptos Light
+   - **Heading 1 (Chapters)**: 16pt Aptos Light
+   - **Heading 2 (Sections)**: 15pt Aptos Light
+   - **Heading 3 (Subsections)**: 13.5pt Aptos Light
+   - **Body Text**: 12pt Aptos Light with 1.4 line spacing
+
+5. **Improved Page Break Management**
+   - Separate pages for Title, Dedication, and Table of Contents
+   - Page break after TOC now configurable (enabled by default)
+   - Professional document structure with proper page separation
+   - Configurable page breaks for all special sections
+
+6. **Enhanced Quote and Multilingual Formatting**
+   - Automatic italic formatting for quotes and blockquotes
+   - Non-English text (Sanskrit, transliterations) italicized automatically
+   - Configurable em-dash removal from citations
+   - Centered alignment for quotes with proper spacing
+
+7. **Claude AI Enhancements**
+   - Support for Claude Code CLI path (~/.claude/local/claude)
+   - Automatic code fence removal from AI output
+   - Improved incomplete response detection
+   - Better error handling with fallback mechanisms
+   - Multi-chunk processing for large documents
+
+### Previous Changes (2025-09-03)
 
 1. **External Configuration System**
    - JSON-based configuration files for formatting rules

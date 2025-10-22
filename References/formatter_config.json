@@ -1,6 +1,22 @@
 {
+  "style_overrides": {
+    "Normal": {
+      "font_name": "Aptos Light",
+      "font_size": 12.0,
+      "line_spacing": 1.4
+    },
+    "Title": {
+      "font_name": "Aptos Light",
+      "font_size": 48.0
+    },
+    "Subtitle": {
+      "font_name": "Aptos Light",
+      "font_size": 36.0
+    }
+  },
   "heading_overrides": {
     "heading_1": {
+      "font_name": "Aptos Light",
       "font_size": 16.0,
       "color": "156082",
       "alignment": "center",
@@ -8,18 +24,21 @@
       "space_after": 4.0
     },
     "heading_2": {
-      "font_size": 16.0,
+      "font_name": "Aptos Light",
+      "font_size": 15.0,
       "color": "156082",
       "alignment": "center"
     },
     "heading_3": {
-      "font_size": 14.0,
+      "font_name": "Aptos Light",
+      "font_size": 13.5,
       "color": "156082",
       "alignment": "center",
       "space_before": 8.0,
-      "space_after": 4.0
+      "space_after": 16.8
     },
     "heading_4": {
+      "font_name": "Aptos Light",
       "font_size": 13.0,
       "italic": true,
       "space_before": 4.0,
@@ -30,6 +49,7 @@
       "italic": true
     },
     "heading_6": {
+      "font_name": "Aptos Light",
       "italic": true,
       "color": "595959",
       "space_before": 2.0
@@ -69,7 +89,8 @@
   "blockquote_formatting": {
     "remove_em_dashes": true,
     "single_line_spacing": true,
-    "center_align": true
+    "center_align": true,
+    "italic": true
   },
   "special_content_formatting": {
     "hierarchical_lists": {
