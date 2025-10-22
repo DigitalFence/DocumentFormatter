@@ -8,6 +8,7 @@ An intelligent document formatter that converts text, markdown, and Word documen
 - **RTF File Support**: Native RTF processing with intelligent text extraction
 - **Smart Style Matching**: Automatically extracts and applies formatting from a reference Word document
 - **AI-Enhanced Text Processing**: Uses Claude AI to intelligently structure plain text and RTF files
+- **Adaptive Document Type Detection**: Automatically distinguishes between complete books (with title, TOC, chapters) and single chapters, applying appropriate heading levels
 - **Professional Typography**: Comprehensive Aptos Light font styling with configurable sizes
 - **Style Override System**: Direct control over fonts, sizes, and spacing for all styles
 - **Finder Integration**: Right-click any document in macOS Finder to format instantly
@@ -82,6 +83,40 @@ python document_converter.py --input document.md --reference template.docx --con
 # Automatically uses Claude for intelligent text structuring
 python document_converter_ai.py input.txt
 ```
+
+## Input File Requirements
+
+### Important: Clean Source Files
+
+For best results, ensure your input files are clean and free of markdown-like special characters:
+
+**⚠️ Common Issues:**
+
+1. **Avoid pre-existing markdown characters in RTF/text files:**
+   - Don't use `#` symbols around headings
+   - Don't use `*` symbols around text for emphasis
+   - Don't use `-`, `*`, or `•` at the start of regular paragraphs
+
+2. **Example of problematic RTF content:**
+   ```
+   # Talk 13: Love That Dares    ← Remove # symbols
+
+   *यथा व्रजगोपिकानाम्*          ← Remove * symbols
+   *Yathâ Vrajagopikânâm*         ← Remove * symbols
+   ```
+
+3. **Why this matters:**
+   - The formatter may misinterpret these characters as markdown
+   - Leads to malformed output like `**text* *` instead of proper blockquotes
+   - AI processing gets confused by mixed formatting
+
+**✅ Clean Input Guidelines:**
+- Use plain text without markdown characters
+- Let the AI detect and add proper markdown structure
+- Keep source files in their natural format
+- Remove any manual markdown formatting
+
+**Note:** If you're manually preparing RTF files, keep them as plain text. The formatter's AI will intelligently add the appropriate structure and formatting.
 
 ## Configuration
 
@@ -279,17 +314,71 @@ The Word Formatter provides real-time notifications during conversion:
 
 ### AI Text Analysis
 When processing plain text files, the AI enhancement:
+- **Adaptive Document Type Detection**: Automatically distinguishes between complete books (with title, TOC, chapters) and single chapters, applying appropriate heading levels
 - Detects heading structures (sections, chapters, sub-sections)
 - Identifies lists and bullet points
 - Recognizes quotes and citations (with special handling for Sanskrit, multilingual content)
-- Automatically italicizes transliterated and non-English text
+- Automatically italicizes transliterated and non-English text (including diacritics like â, î, û)
 - Preserves intentional formatting
 - Adds semantic structure
 - Handles Unicode characters and diacritical marks
 - Formats blockquotes without extra spacing
 - Removes em dashes from citations (configurable)
+- **Consistent Chapter Formatting**: Chapters use Heading 2 style whether in a book or standalone
+
+**Document Structure Recognition:**
+- **Books**: Detected when document has 3+ H1 headings or TOC + 2+ H1 headings
+  - First H1 → Title style (largest font)
+  - TOC → Heading 2
+  - Chapters → Heading 2
+  - Sections → Heading 3
+- **Single Chapters**: Detected when document has only 1 H1 heading without TOC
+  - Chapter → Heading 2 (same as chapters in books)
+  - Sections → Heading 3 (same as in books)
+  - Subsections → Heading 4 (same as in books)
 
 ## Troubleshooting
+
+### Common Issues
+
+#### Malformed Markdown Output (Sutra/Quote Formatting Issues)
+
+**Problem:** AI-generated markdown shows malformed text like:
+```markdown
+**यथा व्रजगोपिकानाम्* *
+*Yathâ Vrajagopikânâm*
+The Gopis of Vraja, for instance.
+```
+
+Instead of properly formatted blockquotes:
+```markdown
+> *यथा व्रजगोपिकानाम्*
+> *Yathâ Vrajagopikânâm*
+> The Gopis of Vraja, for instance.
+```
+
+**Cause:** The input RTF/text file contains pre-existing markdown-like special characters (`#`, `*`, `-`, etc.) that confuse the formatter.
+
+**Solution:**
+1. Open your RTF file in a text editor
+2. Remove any `#` symbols around headings
+3. Remove any `*` symbols around text (unless they're part of the actual content)
+4. Remove markdown-like list markers (`-`, `*`, `•`) at the start of regular paragraphs
+5. Keep the source file as plain text and let the AI add proper structure
+
+**Prevention:** Always prepare source files without markdown formatting. The AI will intelligently detect and add the appropriate structure.
+
+#### Chapter/Heading Level Issues
+
+**Problem:** First heading becomes Title style when it should be Heading 2 (chapter style).
+
+**Cause:** The formatter detected only one H1 heading without a TOC, but still treated it as a book title.
+
+**Solution:** The formatter now automatically detects document type:
+- **Books** (with title, TOC, multiple chapters): First H1 → Title style
+- **Single chapters** (one chapter/talk): First H1 → Heading 2 style
+
+If detection is incorrect, check your document structure or manually adjust in Word after conversion.
 
 ### Quick Action Not Appearing
 
@@ -467,9 +556,51 @@ cp formatter_config.json my_config.json
 python document_converter.py --input doc.md --reference template.docx --config my_config.json
 ```
 
-## Recent Changes (2025-10-21)
+## Recent Changes (2025-10-22)
 
-### Latest Features
+### Latest Features - Adaptive Document Detection
+
+1. **Adaptive Document Type Detection**
+   - Intelligent detection of book vs single chapter documents
+   - Books: Detected by presence of TOC and multiple H1 headings
+   - Single chapters: Detected when only one H1 heading exists without TOC
+   - Automatic heading level adjustment based on document type
+   - Consistent chapter formatting regardless of document type
+
+2. **Enhanced Markdown Processing**
+   - Improved handling of pre-existing markdown characters in input files
+   - Better bullet point detection (avoids treating dialogue as lists)
+   - Smarter heading detection (excludes sentences ending with punctuation)
+   - Fixed chunking issues for multi-chunk AI processing
+   - Prevention of markdown duplication in output
+
+3. **Consistent Chapter Heading Levels**
+   - Chapters always use Heading 2 in Word (whether in book or standalone)
+   - Books: Title style → Heading 2 (chapters) → Heading 3 (sections)
+   - Single chapters: Heading 2 (chapter) → Heading 3 (sections) → Heading 4 (subsections)
+   - No forced title or TOC for single-chapter documents
+
+4. **Improved Sutra and Special Text Formatting**
+   - Enhanced detection of Sanskrit transliterations (including circumflex â, î, û)
+   - Better blockquote formatting for opening sutras
+   - Improved non-English text italicization
+   - Support for Devanagari and transliterated text
+
+5. **Debug and Logging Enhancements**
+   - Added comprehensive debug output for troubleshooting
+   - Improved error messages for file permission issues
+   - Better logging of document structure detection
+   - Enhanced fallback mechanisms when AI processing fails
+
+6. **Documentation Improvements**
+   - Added "Input File Requirements" section with best practices
+   - Documented common issues and solutions
+   - Clear examples of clean vs problematic input
+   - Updated troubleshooting guide with real-world scenarios
+
+### Previous Changes (2025-10-21)
+
+### Features
 
 1. **Comprehensive Aptos Light Font Styling**
    - All text styles now support Aptos Light font family
