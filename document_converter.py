@@ -646,6 +646,10 @@ class DocumentConverter:
             'preface': False,
             'foreword': False
         }
+
+        # Track if we're currently in TOC section (to keep heading and content together)
+        self.in_toc_section = False
+        self.toc_content_started = False
     
     def _clear_template_content(self):
         """Clear all content from the template document while preserving styles."""
@@ -1087,6 +1091,16 @@ class DocumentConverter:
             # Special section page breaks are handled in paragraph processing, not for headings
             # Headings get their page breaks from heading/chapter logic
             
+            # Check if exiting TOC section (new major heading encountered)
+            if self.in_toc_section and self.toc_content_started:
+                # End of TOC section detected, add deferred page break
+                if self.config and self.config.should_add_page_break_after_contents():
+                    self.output_doc.add_page_break()
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: Added deferred page break after TOC content")
+                self.in_toc_section = False
+                self.toc_content_started = False
+
             # Add the heading or title
             if use_title_style or special_section == 'title':
                 # Use Title style instead of heading
@@ -1189,10 +1203,12 @@ class DocumentConverter:
                       self.config.should_add_page_break_after_dedication()):
                     self.output_doc.add_page_break()
                 
-                # Check for Contents page break
-                elif (hasattr(self.config, 'is_contents_keyword') and self.config.is_contents_keyword(heading_text) and 
-                      self.config.should_add_page_break_after_contents()):
-                    self.output_doc.add_page_break()
+                # Check for Contents - mark section but defer page break until after content
+                elif (hasattr(self.config, 'is_contents_keyword') and self.config.is_contents_keyword(heading_text)):
+                    self.in_toc_section = True
+                    self.toc_content_started = False
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: Entered TOC section, deferring page break until after content")
             
             # Check if this heading introduces a hierarchical list section
             if self.config:
@@ -1392,7 +1408,13 @@ class DocumentConverter:
             text = element.get_text().strip()
             if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                 print(f"DEBUG: Processing paragraph element: '{text[:50]}...'")
-            
+
+            # Check if we're in TOC section and this is TOC content
+            if self.in_toc_section and text and not self.toc_content_started:
+                self.toc_content_started = True
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: TOC content started")
+
             # Check for page break placeholder
             if '<!--PAGEBREAK-->' in str(element):
                 if self.config and self.config.should_preserve_original_page_breaks():
@@ -1648,12 +1670,28 @@ class DocumentConverter:
                 # Determine the Word heading level using configuration
                 word_heading_level = level
                 use_title_style = False
-                
+
+                # Check if exiting TOC section (new major heading encountered)
+                if self.in_toc_section and self.toc_content_started:
+                    # End of TOC section detected, add deferred page break
+                    if self.config and self.config.should_add_page_break_after_contents():
+                        self.output_doc.add_page_break()
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Added deferred page break after TOC content (Word doc path)")
+                    self.in_toc_section = False
+                    self.toc_content_started = False
+
                 if self.config:
                     # Check if this is a title
                     if hasattr(self.config, 'is_title_keyword') and self.config.is_title_keyword(heading_text):
                         use_title_style = True
                         word_heading_level = 0
+                    # Check if this is TOC heading
+                    elif hasattr(self.config, 'is_contents_keyword') and self.config.is_contents_keyword(heading_text):
+                        self.in_toc_section = True
+                        self.toc_content_started = False
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Entered TOC section (Word doc path), deferring page break")
                     # Check if this is a section (use Heading 1)
                     elif self.config.is_section_keyword(heading_text):
                         word_heading_level = 1
@@ -1803,6 +1841,12 @@ class DocumentConverter:
             
             # Process regular paragraphs
             else:
+                # Check if we're in TOC section and this is TOC content
+                if self.in_toc_section and para.text.strip() and not self.toc_content_started:
+                    self.toc_content_started = True
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: TOC content started (Word doc path)")
+
                 new_para = self.output_doc.add_paragraph()
                 
                 # Check if this is a blockquote (indented paragraph with specific formatting)
