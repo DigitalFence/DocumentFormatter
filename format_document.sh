@@ -17,7 +17,7 @@ REFERENCE_FORMAT="$SCRIPT_DIR/References/referenceformat.docx"
 echo "Using reference format: $REFERENCE_FORMAT"
 
 # Set the configuration file path
-CONFIG_FILE="$SCRIPT_DIR/References/formatter_config.json"
+CONFIG_FILE="$SCRIPT_DIR/configuration/formatter_config.json"
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "WARNING: Configuration file not found at $CONFIG_FILE"
     CONFIG_FILE=""

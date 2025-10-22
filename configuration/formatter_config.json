@@ -19,40 +19,37 @@
       "font_name": "Aptos Light",
       "font_size": 16.0,
       "color": "156082",
-      "alignment": "center",
-      "space_before": 18.0,
-      "space_after": 4.0
+      "alignment": "center"
     },
     "heading_2": {
       "font_name": "Aptos Light",
-      "font_size": 15.0,
-      "color": "156082",
-      "alignment": "center"
-    },
-    "heading_3": {
-      "font_name": "Aptos Light",
-      "font_size": 13.5,
+      "font_size": 14.0,
       "color": "156082",
       "alignment": "center",
       "space_before": 8.0,
       "space_after": 16.8
     },
-    "heading_4": {
+    "heading_3": {
       "font_name": "Aptos Light",
-      "font_size": 13.0,
+      "font_size": 13.5,
       "italic": true,
       "space_before": 4.0,
       "space_after": 2.0
     },
-    "heading_5": {
+    "heading_4": {
       "font_name": "Aptos Light",
       "italic": true
     },
-    "heading_6": {
+    "heading_5": {
       "font_name": "Aptos Light",
       "italic": true,
       "color": "595959",
       "space_before": 2.0
+    },
+    "heading_6": {
+      "font_name": "Aptos Light",
+      "italic": true,
+      "color": "595959"
     }
   },
   "heading_detection": {
@@ -76,7 +73,7 @@
     "chapter_keywords": [
       "chapter"
     ],
-    "always_use_heading_2_for_chapters": true
+    "always_use_heading_1_for_chapters": true
   },
   "page_breaks": {
     "before_sections": false,

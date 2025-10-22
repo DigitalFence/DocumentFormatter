@@ -22,7 +22,7 @@
     "contents_keywords": ["contents", "table of contents", "toc"],
     "section_keywords": ["section", "part"],
     "chapter_keywords": ["chapter"],
-    "always_use_heading_2_for_chapters": true
+    "always_use_heading_1_for_chapters": true
   },
   "page_breaks": {
     "before_sections": false,

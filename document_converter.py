@@ -1067,9 +1067,9 @@ class DocumentConverter:
                     # Check for page break setting
                     if self.config.should_apply_page_break("section") and len(self.output_doc.paragraphs) > 0:
                         self.output_doc.add_page_break()
-                # Check if this is a chapter (always use Heading 2)
+                # Check if this is a chapter (always use Heading 1)
                 elif level == 1 or self.config.is_chapter_keyword(heading_text):
-                    word_heading_level = 2
+                    word_heading_level = 1
                     
                     # Debug logging
                     if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
@@ -1112,9 +1112,9 @@ class DocumentConverter:
                     self.current_chapter_name = heading_text
                     self.paragraphs_since_chapter = 0
                     self.current_chapter_elements = []
-                # For other headings, shift down by 1 if we have chapters at level 2
+                # For other headings, use markdown level directly (chapters now use Heading 1)
                 elif level >= 2:
-                    word_heading_level = min(level + 1, 6)  # Cap at level 6
+                    word_heading_level = min(level, 6)  # Cap at level 6
             else:
                 # Fallback to hardcoded logic if no config
                 # Check if this is a title first
@@ -1124,11 +1124,11 @@ class DocumentConverter:
                 elif 'section' in heading_text.lower() or 'part' in heading_text.lower():
                     word_heading_level = 1
                 elif level == 1 or 'chapter' in heading_text.lower():
-                    word_heading_level = 2
+                    word_heading_level = 1
                     if len(self.output_doc.paragraphs) > 0:
                         self.output_doc.add_page_break()
                 elif level >= 2:
-                    word_heading_level = min(level + 1, 6)
+                    word_heading_level = min(level, 6)
             
             # Check if this is a special section
             special_section = self._is_special_section(heading_text)
@@ -1747,9 +1747,9 @@ class DocumentConverter:
                         # Check for page break setting
                         if self.config.should_apply_page_break("section") and len(self.output_doc.paragraphs) > 0:
                             self.output_doc.add_page_break()
-                    # Check if this is a chapter (always use Heading 2)
+                    # Check if this is a chapter (always use Heading 1)
                     elif level == 1 or self.config.is_chapter_keyword(heading_text):
-                        word_heading_level = 2
+                        word_heading_level = 1
                         
                         # Add chapter separator if configured
                         separator_settings = self.config.get_chapter_separator()
@@ -1783,19 +1783,19 @@ class DocumentConverter:
                             # Just page break if no separator
                             if self.config.should_apply_page_break("chapter") and len(self.output_doc.paragraphs) > 0:
                                 self.output_doc.add_page_break()
-                    # For other headings, shift down by 1 if we have chapters at level 2
+                    # For other headings, use markdown level directly (chapters now use Heading 1)
                     elif level >= 2:
-                        word_heading_level = min(level + 1, 6)
+                        word_heading_level = min(level, 6)
                 else:
                     # Fallback logic without config
                     if 'section' in heading_text.lower() or 'part' in heading_text.lower():
                         word_heading_level = 1
                     elif level == 1 or 'chapter' in heading_text.lower():
-                        word_heading_level = 2
+                        word_heading_level = 1
                         if len(self.output_doc.paragraphs) > 0:
                             self.output_doc.add_page_break()
                     elif level >= 2:
-                        word_heading_level = min(level + 1, 6)
+                        word_heading_level = min(level, 6)
                 
                 # Add the heading or title
                 if use_title_style:

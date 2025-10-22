@@ -15,17 +15,17 @@ The system automatically detects whether a document is:
 
 **Book structure (Markdown → Word):**
 - `# Book Title` → Title style (largest font)
-- `# Table of Contents` → Heading 2
-- `# Chapter 1: Name` → Heading 2
-- `## Section` → Heading 3
-- `### Subsection` → Heading 4
+- `# Table of Contents` → Heading 1
+- `# Chapter 1: Name` → Heading 1
+- `## Section` → Heading 2
+- `### Subsection` → Heading 3
 
 **Single chapter structure (Markdown → Word):**
-- `# Talk 13: Love That Dares` → Heading 2 (same as chapters in books)
-- `## Section` → Heading 3 (same as in books)
-- `### Subsection` → Heading 4 (same as in books)
+- `# Talk 13: Love That Dares` → Heading 1 (same as chapters in books)
+- `## Section` → Heading 2 (same as in books)
+- `### Subsection` → Heading 3 (same as in books)
 
-**Key principle:** Chapters use **Heading 2** in Word (whether in a book or standalone). The only difference is books have a Title before chapters.
+**Key principle:** Chapters use **Heading 1** in Word (whether in a book or standalone). The only difference is books have a Title before chapters.
 
 ## Architecture
 
@@ -121,8 +121,8 @@ First, analyze the document structure to determine its type:
 STEP 2: APPLY APPROPRIATE FORMATTING
 Instructions:
 1. Identify and mark headings based on context and document type
-2. For BOOKS: Use # (H1) for title/TOC/chapters, ## (H2) for sections
-3. For ARTICLES: Use ## (H2) for main sections, ### (H3) for subsections
+2. For BOOKS: Use # (H1) for title/TOC/chapters, ## (H2) for sections, ### (H3) for subsections
+3. For ARTICLES: Use # (H1) for main sections, ## (H2) for subsections, ### (H3) for sub-subsections
 4. Detect lists (both bulleted and numbered) and format appropriately
 5. Recognize quotes, citations, and special blocks
 6. Preserve all original text content exactly

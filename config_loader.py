@@ -18,7 +18,7 @@ class FormatterConfig:
         "heading_detection": {
             "section_keywords": ["section", "part"],
             "chapter_keywords": ["chapter"],
-            "always_use_heading_2_for_chapters": True
+            "always_use_heading_1_for_chapters": True
         },
         "page_breaks": {
             "before_sections": False,
@@ -53,11 +53,14 @@ class FormatterConfig:
         if config_path:
             config_file = Path(config_path)
         else:
-            # Look for config in References directory first
+            # Look for config in configuration directory first
             script_dir = Path(__file__).parent
-            config_file = script_dir / "References" / "formatter_config.json"
-            
-            # Try old location for backward compatibility
+            config_file = script_dir / "configuration" / "formatter_config.json"
+
+            # Try old locations for backward compatibility
+            if not config_file.exists():
+                config_file = script_dir / "References" / "formatter_config.json"
+
             if not config_file.exists():
                 config_file = script_dir / "formatter_config.json"
             

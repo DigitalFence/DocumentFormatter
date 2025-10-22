@@ -182,7 +182,7 @@ Create a `formatter_config.json` file:
   "heading_detection": {
     "section_keywords": ["section", "part"],
     "chapter_keywords": ["chapter"],
-    "always_use_heading_2_for_chapters": true
+    "always_use_heading_1_for_chapters": true
   },
   "page_breaks": {
     "before_sections": false,
@@ -216,9 +216,9 @@ Create a `formatter_config.json` file:
 - Recommended: Use Aptos Light for consistent typography
 
 **Heading Detection:**
-- `section_keywords`: Words that identify section headings (use Heading 1)
-- `chapter_keywords`: Words that identify chapter headings (use Heading 2)
-- `always_use_heading_2_for_chapters`: Ensures chapters always use Heading 2
+- `section_keywords`: Words that identify section headings
+- `chapter_keywords`: Words that identify chapter headings (use Heading 1)
+- `always_use_heading_1_for_chapters`: Ensures chapters always use Heading 1
 
 **Page Breaks:**
 - `before_sections`: Insert page break before section headings
@@ -236,11 +236,11 @@ Create a `formatter_config.json` file:
 #### Document Structure
 
 The formatter now supports a hierarchical document structure:
-- **Heading 1**: Sections (e.g., "Section I: Introduction")
-- **Heading 2**: Chapters (e.g., "Chapter 1: Getting Started")
-- **Heading 3**: Sub-sections (customizable via config)
-- **Heading 4**: Sub-sub-sections (customizable via config)
-- **Heading 5-6**: Additional levels
+- **Title**: Book title (when detected as a multi-chapter book)
+- **Heading 1**: Chapters (e.g., "Chapter 1: Getting Started", "Table of Contents")
+- **Heading 2**: Sections (e.g., "Introduction", "Key Concepts")
+- **Heading 3**: Subsections (customizable via config)
+- **Heading 4-6**: Additional levels (customizable via config)
 
 ### AI Enhancement Configuration
 
@@ -324,18 +324,19 @@ When processing plain text files, the AI enhancement:
 - Handles Unicode characters and diacritical marks
 - Formats blockquotes without extra spacing
 - Removes em dashes from citations (configurable)
-- **Consistent Chapter Formatting**: Chapters use Heading 2 style whether in a book or standalone
+- **Consistent Chapter Formatting**: Chapters use Heading 1 style whether in a book or standalone
 
 **Document Structure Recognition:**
 - **Books**: Detected when document has 3+ H1 headings or TOC + 2+ H1 headings
   - First H1 → Title style (largest font)
-  - TOC → Heading 2
-  - Chapters → Heading 2
-  - Sections → Heading 3
+  - TOC → Heading 1
+  - Chapters → Heading 1
+  - Sections → Heading 2
+  - Subsections → Heading 3
 - **Single Chapters**: Detected when document has only 1 H1 heading without TOC
-  - Chapter → Heading 2 (same as chapters in books)
-  - Sections → Heading 3 (same as in books)
-  - Subsections → Heading 4 (same as in books)
+  - Chapter → Heading 1 (same as chapters in books)
+  - Sections → Heading 2 (same as in books)
+  - Subsections → Heading 3 (same as in books)
 
 ## Troubleshooting
 
@@ -370,13 +371,13 @@ Instead of properly formatted blockquotes:
 
 #### Chapter/Heading Level Issues
 
-**Problem:** First heading becomes Title style when it should be Heading 2 (chapter style).
+**Problem:** First heading becomes Title style when it should be Heading 1 (chapter style).
 
 **Cause:** The formatter detected only one H1 heading without a TOC, but still treated it as a book title.
 
 **Solution:** The formatter now automatically detects document type:
 - **Books** (with title, TOC, multiple chapters): First H1 → Title style
-- **Single chapters** (one chapter/talk): First H1 → Heading 2 style
+- **Single chapters** (one chapter/talk): First H1 → Heading 1 style
 
 If detection is incorrect, check your document structure or manually adjust in Word after conversion.
 
@@ -575,9 +576,9 @@ python document_converter.py --input doc.md --reference template.docx --config m
    - Prevention of markdown duplication in output
 
 3. **Consistent Chapter Heading Levels**
-   - Chapters always use Heading 2 in Word (whether in book or standalone)
-   - Books: Title style → Heading 2 (chapters) → Heading 3 (sections)
-   - Single chapters: Heading 2 (chapter) → Heading 3 (sections) → Heading 4 (subsections)
+   - Chapters always use Heading 1 in Word (whether in book or standalone)
+   - Books: Title style → Heading 1 (chapters) → Heading 2 (sections) → Heading 3 (subsections)
+   - Single chapters: Heading 1 (chapter) → Heading 2 (sections) → Heading 3 (subsections)
    - No forced title or TOC for single-chapter documents
 
 4. **Improved Sutra and Special Text Formatting**
@@ -625,9 +626,9 @@ python document_converter.py --input doc.md --reference template.docx --config m
 4. **Professional Typography Settings**
    - **Title**: 48pt Aptos Light
    - **Subtitle**: 36pt Aptos Light
-   - **Heading 1 (Chapters)**: 16pt Aptos Light
-   - **Heading 2 (Sections)**: 15pt Aptos Light
-   - **Heading 3 (Subsections)**: 13.5pt Aptos Light
+   - **Heading 1 (Chapters)**: 16pt Aptos Light, centered
+   - **Heading 2 (Sections)**: 14pt Aptos Light, centered
+   - **Heading 3 (Subsections)**: 13.5pt Aptos Light, italic
    - **Body Text**: 12pt Aptos Light with 1.4 line spacing
 
 5. **Improved Page Break Management**
@@ -658,10 +659,10 @@ python document_converter.py --input doc.md --reference template.docx --config m
    - Page break control for sections and chapters
 
 2. **Enhanced Document Structure**
-   - Sections use Heading 1 style
-   - Chapters always use Heading 2 style (configurable)
-   - Sub-sections and sub-sub-sections with customizable formatting
-   - Automatic heading level adjustment
+   - Chapters use Heading 1 style (configurable)
+   - Sections use Heading 2 style
+   - Subsections and additional levels with customizable formatting
+   - Automatic heading level adjustment based on document type
 
 3. **macOS Alias Support**
    - Reference documents can now be macOS aliases

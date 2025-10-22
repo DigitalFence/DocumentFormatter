@@ -31,7 +31,7 @@ def analyze_reference_document(doc_path):
             "contents_keywords": ["contents", "table of contents", "toc"],
             "section_keywords": ["section", "part"],
             "chapter_keywords": ["chapter"],
-            "always_use_heading_2_for_chapters": True
+            "always_use_heading_1_for_chapters": True
         },
         "page_breaks": {
             "before_sections": False,
