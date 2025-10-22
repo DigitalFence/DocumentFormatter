@@ -1164,7 +1164,13 @@ class DocumentConverter:
                             run.font.name = override['font_name']
                         if 'font_size' in override and override['font_size'] is not None:
                             run.font.size = Pt(override['font_size'])
-                    
+
+                    # Apply paragraph spacing overrides
+                    if 'space_before' in override and override['space_before'] is not None:
+                        heading.paragraph_format.space_before = Pt(override['space_before'])
+                    if 'space_after' in override and override['space_after'] is not None:
+                        heading.paragraph_format.space_after = Pt(override['space_after'])
+
                     # Note: Other formatting from template is preserved unless overridden
                 else:
                     # No override - template styles are used
@@ -1765,6 +1771,12 @@ class DocumentConverter:
                                 run.font.name = override['font_name']
                             if 'font_size' in override and override['font_size'] is not None:
                                 run.font.size = Pt(override['font_size'])
+
+                        # Apply paragraph spacing overrides
+                        if 'space_before' in override and override['space_before'] is not None:
+                            heading.paragraph_format.space_before = Pt(override['space_before'])
+                        if 'space_after' in override and override['space_after'] is not None:
+                            heading.paragraph_format.space_after = Pt(override['space_after'])
             
             # Process lists
             elif para.style and para.style.name and ('List' in para.style.name or 'Bullet' in para.style.name):
