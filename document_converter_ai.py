@@ -412,6 +412,53 @@ Text to convert:
 
         return cleaned_content
 
+    def _fix_sutra_placement(self, markdown_content: str) -> str:
+        """
+        Fix opening sutras/epigraphs that appear BEFORE the chapter title.
+
+        This is a safety net in case the AI prompt doesn't prevent reordering.
+        The AI prompt instructs Claude to preserve original line order, but this
+        post-processing ensures correct placement even if the AI doesn't follow instructions.
+
+        Pattern to fix:
+        > *Sanskrit text*
+        > *Transliteration*
+        > Translation
+
+        # Chapter Title
+
+        Should be:
+        # Chapter Title
+
+        > *Sanskrit text*
+        > *Transliteration*
+        > Translation
+        """
+        import re
+
+        # Pattern: blockquote(s) followed by blank line(s) followed by H1 heading
+        # This captures opening sutras/epigraphs that appear before the chapter title
+        pattern = r'^((?:>\s*\*[^*]+\*\s*\n)+(?:>\s*[^\n]+\n)*)\n+(# .+)$'
+
+        match = re.search(pattern, markdown_content, re.MULTILINE)
+
+        if match:
+            blockquote_section = match.group(1)
+            h1_heading = match.group(2)
+
+            if self.debug:
+                print(f"⚠️  Found opening blockquote BEFORE H1 title")
+                print(f"   Moving blockquote to appear AFTER the title")
+
+            # Replace the matched section with title first, then blockquote
+            replacement = f"{h1_heading}\n\n{blockquote_section}"
+            markdown_content = re.sub(pattern, replacement, markdown_content, count=1, flags=re.MULTILINE)
+
+            if self.show_progress:
+                print(f"   ✓ Fixed opening sutra placement (moved after title)")
+
+        return markdown_content
+
     def _simple_text_to_markdown(self, text_content: str, is_first_chunk: bool = True) -> str:
         """
         Simple fallback conversion from text to markdown.
@@ -669,6 +716,9 @@ Text to convert:
 
         # Post-process to remove duplicate H1 headings
         markdown_content = self._remove_duplicate_h1_headings(markdown_content)
+
+        # Post-process to fix sutra placement (safety net if AI doesn't follow instructions)
+        markdown_content = self._fix_sutra_placement(markdown_content)
 
         return markdown_content
     
