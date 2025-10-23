@@ -86,20 +86,43 @@ UNIVERSAL FORMATTING RULES (apply to ALL):
    - Maintain the original tone and style
    - Focus on structure, not rewriting
 
-5. FORMAT CODE BLOCKS:
+5. ⚠️ CRITICAL: PRESERVE ORIGINAL LINE ORDER:
+   - NEVER rearrange, reorder, or move lines from their original position
+   - Keep everything in EXACTLY the same sequence as the input text
+   - If the original has: Title → Sutra → Content, keep that exact order
+   - Do NOT move sutras/epigraphs/quotes before titles
+   - Do NOT reorganize content for "better structure"
+   - Only ADD markdown formatting symbols (# ## * > etc.) without changing position
+   - Example: If input is:
+     "Title
+      Sanskrit text
+      Translation
+      Content"
+   - Output should be:
+     "# Title
+      > *Sanskrit text*
+      > Translation
+      Content"
+   - NOT:
+     "> *Sanskrit text*
+      > Translation
+      # Title
+      Content"
+
+6. FORMAT CODE BLOCKS:
    - Identify code snippets and format with triple backticks
 
-6. IDENTIFY TABLES:
+7. IDENTIFY TABLES:
    - Convert to markdown table format
 
-7. ITALICIZE NON-ENGLISH TEXT with *text* formatting:
+8. ITALICIZE NON-ENGLISH TEXT with *text* formatting:
    - Sanskrit transliterations (text with diacritical marks like ā, ī, ū, ṛ, ṣ, ṇ, ṃ, ḥ, etc.)
    - Devanagari script (हिन्दी, संस्कृत)
    - Arabic, Hebrew, Chinese, Japanese, or any other non-Latin scripts
    - Romanized/transliterated words from other languages
    - Example: *Vāg vai brahma | vācā hy evedaṃ sarvaṃ sṛṣṭam*
 
-8. SPECIAL FORMATTING FOR OPENING QUOTES (sutras, epigraphs, etc.):
+9. SPECIAL FORMATTING FOR OPENING QUOTES (sutras, epigraphs, etc.):
    - Detect Sanskrit/spiritual quotes at the beginning of sections/chapters
    - Format as centered blockquotes with this pattern:
      > *Sanskrit transliteration in italics*
@@ -109,7 +132,7 @@ UNIVERSAL FORMATTING RULES (apply to ALL):
    - The transliteration should be italicized
    - ALWAYS use em dash (—) before attribution/source, not hyphen (-)
 
-9. SPECIAL FORMATTING FOR HIERARCHICAL LISTS (roles, principles, qualities, etc.):
+10. SPECIAL FORMATTING FOR HIERARCHICAL LISTS (roles, principles, qualities, etc.):
    - Look for patterns like "Transformational Roles", "Meta Roles", "Principles", "Types", "Aspects", etc.
    - Format these headers using appropriate heading level based on document type and context
    - CRITICAL: Format numbered items with their numbers but NOT as markdown numbered lists
@@ -129,7 +152,7 @@ UNIVERSAL FORMATTING RULES (apply to ALL):
    - Use bullet character • (not -) with 4-space indentation for sub-items
    - This creates proper visual hierarchy while preserving exact numbering
 
-10. DIALOGUE FORMATTING:
+11. DIALOGUE FORMATTING:
    - Keep dialogue as regular paragraphs with speaker names in bold
    - Format as: **Speaker Name**: dialogue text
    - Do NOT add bullet points to dialogue lines
@@ -145,6 +168,8 @@ CRITICAL REQUIREMENTS:
 - Return ONLY the complete markdown formatted text - start directly with the content
 
 CRITICAL REMINDERS:
+
+0. ⚠️ NEVER REORDER CONTENT: Keep all lines in their ORIGINAL sequence. Do NOT move sutras, quotes, or any content before/after where they appear in the input.
 
 1. CHAPTER FORMATTING IS IDENTICAL:
    - Single chapter "Talk 13: Love That Dares" → # Talk 13: Love That Dares (H1)
@@ -386,52 +411,6 @@ Text to convert:
             print(f"   ✓ Removed {len(h1_matches) - 1} duplicate H1 heading(s)")
 
         return cleaned_content
-
-    def _fix_sutra_placement(self, markdown_content: str) -> str:
-        """
-        Fix opening sutras/epigraphs that appear BEFORE the chapter title.
-
-        Sometimes Claude AI places opening sutras/quotes before the H1 title,
-        but they should appear AFTER the title as the opening content of the chapter.
-
-        Pattern to fix:
-        > *Sanskrit text*
-        > *Transliteration*
-        > Translation
-
-        # Chapter Title
-
-        Should be:
-        # Chapter Title
-
-        > *Sanskrit text*
-        > *Transliteration*
-        > Translation
-        """
-        import re
-
-        # Pattern: blockquote(s) followed by blank line(s) followed by H1 heading
-        # This captures opening sutras/epigraphs that appear before the chapter title
-        pattern = r'^((?:>\s*\*[^*]+\*\s*\n)+(?:>\s*[^\n]+\n)*)\n+(# .+)$'
-
-        match = re.search(pattern, markdown_content, re.MULTILINE)
-
-        if match:
-            blockquote_section = match.group(1)
-            h1_heading = match.group(2)
-
-            if self.debug:
-                print(f"⚠️  Found opening blockquote BEFORE H1 title")
-                print(f"   Moving blockquote to appear AFTER the title")
-
-            # Replace the matched section with title first, then blockquote
-            replacement = f"{h1_heading}\n\n{blockquote_section}"
-            markdown_content = re.sub(pattern, replacement, markdown_content, count=1, flags=re.MULTILINE)
-
-            if self.show_progress:
-                print(f"   ✓ Fixed opening sutra placement (moved after title)")
-
-        return markdown_content
 
     def _simple_text_to_markdown(self, text_content: str, is_first_chunk: bool = True) -> str:
         """
@@ -690,9 +669,6 @@ Text to convert:
 
         # Post-process to remove duplicate H1 headings
         markdown_content = self._remove_duplicate_h1_headings(markdown_content)
-
-        # Post-process to fix sutra placement (move sutras from before title to after)
-        markdown_content = self._fix_sutra_placement(markdown_content)
 
         return markdown_content
     
