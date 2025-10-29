@@ -889,10 +889,13 @@ Text to convert:
             return text.strip()
 
         # Check 2: Detect dialogue patterns BEFORE stripping markdown
-        # Look for patterns like "**Name**: dialogue" or "Name: dialogue"
-        dialogue_pattern = r'^\*\*[A-Z][a-zA-Z\s]+\*\*:\s*.+$'
-        dialogue_lines = re.findall(dialogue_pattern, markdown_output, re.MULTILINE)
-        dialogue_count_in_original = len(re.findall(dialogue_pattern, original_text, re.MULTILINE))
+        # Look for formatted dialogue in markdown output: "**Name**: text"
+        # And plain dialogue in original text: "Name: text"
+        formatted_dialogue_pattern = r'^\*\*[A-Z][a-zA-Z\s]+\*\*:\s*.+$'
+        plain_dialogue_pattern = r'^[A-Z][a-zA-Z\s]+:\s*.+$'
+
+        dialogue_lines = re.findall(formatted_dialogue_pattern, markdown_output, re.MULTILINE)
+        dialogue_count_in_original = len(re.findall(plain_dialogue_pattern, original_text, re.MULTILINE))
 
         # Now strip markdown for length comparison
         original_stripped = strip_markdown(original_text)
