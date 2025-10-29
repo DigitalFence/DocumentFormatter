@@ -12,10 +12,6 @@ echo "Script started with arguments: $@"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo "Script directory: $SCRIPT_DIR"
 
-# Set the reference format document path
-REFERENCE_FORMAT="$SCRIPT_DIR/References/referenceformat.docx"
-echo "Using reference format: $REFERENCE_FORMAT"
-
 # Set the configuration file path
 CONFIG_FILE="$SCRIPT_DIR/configuration/formatter_config.json"
 if [ ! -f "$CONFIG_FILE" ]; then
@@ -23,6 +19,36 @@ if [ ! -f "$CONFIG_FILE" ]; then
     CONFIG_FILE=""
 else
     echo "Using configuration file: $CONFIG_FILE"
+fi
+
+# Determine reference format document path from config
+REFERENCE_FORMAT=""
+if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
+    # Try to extract external_reference_folder and reference_template from config
+    external_folder=$(python3 -c "import json; config=json.load(open('$CONFIG_FILE')); print(config.get('external_reference_folder', ''))" 2>/dev/null)
+    template_name=$(python3 -c "import json; config=json.load(open('$CONFIG_FILE')); print(config.get('reference_template', ''))" 2>/dev/null)
+
+    if [ -n "$external_folder" ] && [ -n "$template_name" ]; then
+        # Try external reference folder first
+        candidate_path="$external_folder/$template_name"
+        if [ -f "$candidate_path" ]; then
+            REFERENCE_FORMAT="$candidate_path"
+            echo "Using external reference template: $REFERENCE_FORMAT"
+        fi
+    fi
+fi
+
+# Fall back to local References folder if not found in external location
+if [ -z "$REFERENCE_FORMAT" ]; then
+    # Try .dotx first, then .docx
+    if [ -f "$SCRIPT_DIR/References/ReferenceFormat.dotx" ]; then
+        REFERENCE_FORMAT="$SCRIPT_DIR/References/ReferenceFormat.dotx"
+    elif [ -f "$SCRIPT_DIR/References/referenceformat.docx" ]; then
+        REFERENCE_FORMAT="$SCRIPT_DIR/References/referenceformat.docx"
+    else
+        REFERENCE_FORMAT="$SCRIPT_DIR/References/referenceformat.docx"
+    fi
+    echo "Using local reference format: $REFERENCE_FORMAT"
 fi
 
 # Check virtual environment

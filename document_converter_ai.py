@@ -1106,17 +1106,19 @@ Text to convert:
         if self.show_progress:
             print(f"📦 Processing {len(chunks)} chunks...")
         
-        # Process each chunk
+        # Process each chunk with full retry strategy
         markdown_chunks = []
         for i, chunk in enumerate(chunks):
             if self.show_progress:
-                print(f"   Processing chunk {i+1}/{len(chunks)}...")
-            
+                print(f"\n{'='*60}")
+                print(f"📦 PROCESSING CHUNK {i+1} of {len(chunks)}")
+                print(f"{'='*60}\n")
+
             # Send notification for chunk progress
             try:
                 percent = int((i / len(chunks)) * 100)
                 notification_msg = f"Processing chunk {i+1} of {len(chunks)} ({percent}% complete)"
-                
+
                 # Try terminal-notifier first if available
                 if subprocess.run(['which', 'terminal-notifier'], capture_output=True).returncode == 0:
                     subprocess.run([
@@ -1135,21 +1137,20 @@ Text to convert:
             except:
                 pass  # Silently fail if notification fails
 
-            prompt = self._create_analysis_prompt(chunk, toc_chapters)
-            success, result = self._call_claude(prompt)
+            # Use full retry strategy for each chunk (prioritize quality)
+            result = self._attempt_ai_conversion_with_retries(chunk, toc_chapters)
 
-            if not success and "timed out" in result and self.enable_haiku_fallback:
-                if self.show_progress:
-                    print(f"   🔄 Retrying chunk {i+1} with Haiku...")
-                success, result = self._call_claude(prompt, 'haiku')
-            
-            if success:
+            if result:
+                # AI conversion succeeded with validation
                 markdown_chunks.append(result)
             else:
-                # Fallback to simple conversion for this chunk
+                # All AI attempts failed for this chunk - use simple conversion as last resort
                 if self.show_progress:
-                    print(f"   ⚠️ Chunk {i+1}/{len(chunks)} failed")
-                    print(f"   → Using rule-based conversion for this section")
+                    print(f"\n{'='*60}")
+                    print(f"⚠️  CHUNK {i+1}/{len(chunks)}: All AI attempts exhausted")
+                    print(f"{'='*60}")
+                    print(f"Using rule-based conversion for this chunk only")
+                    print(f"{'='*60}\n")
                 # Only first chunk can have H1 headings
                 is_first_chunk = (i == 0)
                 markdown_chunks.append(self._simple_text_to_markdown(chunk, is_first_chunk=is_first_chunk))
