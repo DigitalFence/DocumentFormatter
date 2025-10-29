@@ -1,6 +1,6 @@
 {
   "external_reference_folder": "/Users/KDP/WordFormatReference",
-  "reference_template": "referenceformat.docx",
+  "reference_template": "ReferenceFormat.dotx",
   "style_overrides": {
     "Normal": {
       "font_name": "Aptos Light",

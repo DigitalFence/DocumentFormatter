@@ -608,7 +608,51 @@ class DocumentConverter:
         
         # Use reference document as template to preserve all styles
         print(f"Using template approach with reference: {resolved_path}")
-        self.output_doc = Document(resolved_path)
+
+        # Handle .dotx template files (python-docx rejects .dotx content-type by default)
+        if resolved_path.endswith('.dotx'):
+            # Convert .dotx to .docx by modifying content-type in the ZIP
+            import zipfile
+            import tempfile
+            import xml.etree.ElementTree as ET
+
+            # Create temp file for converted .docx
+            temp_fd, temp_path = tempfile.mkstemp(suffix='.docx')
+            os.close(temp_fd)
+
+            try:
+                # Read .dotx as ZIP and modify content-type
+                with zipfile.ZipFile(resolved_path, 'r') as dotx_zip:
+                    with zipfile.ZipFile(temp_path, 'w', zipfile.ZIP_DEFLATED) as docx_zip:
+                        for item in dotx_zip.infolist():
+                            data = dotx_zip.read(item.filename)
+
+                            # Modify [Content_Types].xml to change template type to document type
+                            if item.filename == '[Content_Types].xml':
+                                # Parse XML
+                                tree = ET.ElementTree(ET.fromstring(data))
+                                root = tree.getroot()
+
+                                # Change template content-type to document content-type
+                                for override in root.findall('.//{http://schemas.openxmlformats.org/package/2006/content-types}Override'):
+                                    if 'template' in override.get('ContentType', ''):
+                                        override.set('ContentType', override.get('ContentType').replace('template', 'document'))
+
+                                # Write modified XML
+                                data = ET.tostring(root, encoding='utf-8', xml_declaration=True)
+
+                            docx_zip.writestr(item, data)
+
+                # Now open the converted file
+                self.output_doc = Document(temp_path)
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(temp_path)
+                except:
+                    pass
+        else:
+            self.output_doc = Document(resolved_path)
         
         # Clear all content from template while preserving styles
         self._clear_template_content()
@@ -2118,8 +2162,8 @@ def main():
         print(f"Error: Reference file does not exist: {reference_path}")
         sys.exit(1)
     
-    if reference_path.suffix.lower() not in ['.docx', '.doc']:
-        print(f"Error: Reference file must be a Word document (.docx or .doc)")
+    if reference_path.suffix.lower() not in ['.docx', '.doc', '.dotx']:
+        print(f"Error: Reference file must be a Word document (.docx, .dotx, or .doc)")
         sys.exit(1)
     
     # Determine output path (only needed for conversion, not style export)
