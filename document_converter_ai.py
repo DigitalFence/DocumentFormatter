@@ -133,14 +133,28 @@ This is a RETRY attempt because previous AI output FAILED validation.
 {ultra_strict_section}
 🚨 ABSOLUTELY CRITICAL - ZERO TOLERANCE RULES - READ FIRST:
 
-1. ⛔ NEVER INVENT, ADD, OR FABRICATE ANY CONTENT
+⚠️⚠️⚠️ CRITICAL OUTPUT FORMAT ⚠️⚠️⚠️
+- Return ONLY the markdown formatted text
+- Start IMMEDIATELY with the first heading or content from the document
+- NO introductions, explanations, analysis, or meta-commentary
+- NO phrases like "Here's the formatted text", "I'll analyze", "Based on my analysis"
+- NO "This is a X document" or ANY commentary about the document
+- Your FIRST character should be # or > or actual text from the document
+
+WRONG: "I'll format this text for you. # Chapter 1..."
+RIGHT: "# Chapter 1..."
+
+1. ⛔ NEVER ADD, REMOVE, OR FABRICATE ANY CONTENT
    - Do NOT create dialogue that doesn't exist in the original
    - Do NOT add characters, names, speakers, or people not in original
    - Do NOT expand, elaborate, paraphrase, or "improve" the text
    - Do NOT write what you think should be there
    - Do NOT add your own interpretations or explanations
+   - ⚠️ Do NOT remove, skip, or omit ANY original text - even short headings like "Sutra 47"
+   - ⚠️ EVERY line from the original must appear in your output
    - ONLY format what IS ACTUALLY in the original text
    - IF YOU ADD EVEN ONE SENTENCE NOT IN THE ORIGINAL, YOU HAVE COMPLETELY FAILED
+   - IF YOU REMOVE EVEN ONE SENTENCE FROM THE ORIGINAL, YOU HAVE COMPLETELY FAILED
 
 2. ✅ YOUR ONLY JOB: ADD MARKDOWN FORMATTING SYMBOLS
    - Add # ## ### for headings (only to text that's already there)
@@ -246,20 +260,32 @@ UNIVERSAL FORMATTING RULES (apply to ALL):
    - Example: *Vāg vai brahma | vācā hy evedaṃ sarvaṃ sṛṣṭam*
 
 9. SPECIAL FORMATTING FOR OPENING QUOTES (sutras, epigraphs, etc.):
+   - ⚠️ PRESERVE SUTRA TITLES/NUMBERS: If you see "Sutra 47", "Verse 12", etc. as standalone heading, format as ## heading
+   - Example structure:
+     ## Sutra 47
+
+     > *sanskrit text...*
+     > *transliteration...*
+     > Translation...
    - Detect Sanskrit/spiritual quotes at the beginning of sections/chapters
    - ⚠️ CRITICAL: Do NOT add labels like "Sanskrit:", "Transliteration:", "Translation:"
    - Format ONLY the actual text content without any labels
    - Pattern for formatting (without labels):
-     > *sanskrit text in devanagari or transliteration*
-     > English translation
+     > *devanagari text* (if present, italicize)
+     > *transliteration text* (if present, also italicize)
+     > English translation (plain text, no italics)
      > — Source citation (if present, always start with em dash)
    - Use > for blockquote with single line breaks
-   - The transliteration/sanskrit should be italicized
+   - Both Devanagari AND transliteration should be italicized when both exist
    - ALWAYS use em dash (—) before attribution/source, not hyphen (-)
-   - Example CORRECT:
+   - Example CORRECT with both formats:
+     > *यो विविक्तस्थानं सेवते*
      > *yo viviktasthanaṁ sevate*
      > Someone who worships alone...
-   - Example WRONG:
+   - Example CORRECT with transliteration only:
+     > *yo viviktasthanaṁ sevate*
+     > Someone who worships alone...
+   - Example WRONG (labels added):
      > *Transliteration: yo viviktasthanaṁ sevate*
      > Translation: Someone who worships alone...
 
