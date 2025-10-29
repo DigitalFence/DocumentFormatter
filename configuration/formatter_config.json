@@ -1,4 +1,6 @@
 {
+  "external_reference_folder": "/Users/KDP/WordFormatReference",
+  "reference_template": "referenceformat.docx",
   "style_overrides": {
     "Normal": {
       "font_name": "Aptos Light",
@@ -152,8 +154,8 @@
   "chapter_separator": {
     "enabled": true,
     "symbol": "\u2766",
-    "symbol_source": "/Users/KDP/scripts/wordformatterbyclaude/References/Symbols.docx",
-    "comment": "Set symbol_source to path of Word doc to extract first symbol from it",
+    "symbol_source": "Symbols.docx",
+    "comment": "Symbol source filename (looks in external_reference_folder first, then References/)",
     "position": "after",
     "spacing_before": 12,
     "spacing_after": 12,

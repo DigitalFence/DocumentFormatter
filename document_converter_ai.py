@@ -23,10 +23,31 @@ except ImportError:
 
 class AIDocumentConverter:
     """Converts documents with AI-powered text analysis."""
-    
-    def __init__(self, reference_path: str, config_path: Optional[str] = None):
-        # Resolve any aliases or symlinks
-        self.reference_path = resolve_path(reference_path)
+
+    def __init__(self, reference_path: Optional[str] = None, config_path: Optional[str] = None):
+        """Initialize AI Document Converter.
+
+        Args:
+            reference_path: Path to reference template. If None, uses path from config.
+            config_path: Path to configuration file. If None, uses default config location.
+        """
+        # Load config first to get reference template path
+        from config_loader import FormatterConfig
+        self.config = FormatterConfig(config_path)
+
+        # Resolve reference path from config if not provided
+        if reference_path is None:
+            template_path = self.config.get_reference_template_path()
+            if template_path:
+                self.reference_path = str(template_path)
+            else:
+                # Fall back to default in References folder
+                script_dir = Path(__file__).parent
+                self.reference_path = str(script_dir / "References" / "referenceformat.docx")
+        else:
+            # Resolve any aliases or symlinks
+            self.reference_path = resolve_path(reference_path)
+
         self.converter = DocumentConverter(self.reference_path, config_path=config_path)
         self.config_path = config_path
         self.debug = os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1'
@@ -919,8 +940,9 @@ def main():
             print(f"  - {Path.home() / 'Desktop'}")
             sys.exit(1)
     
-    # Create converter and process
-    converter = AIDocumentConverter(str(reference_path), config_path=args.config)
+    # Create converter and process (pass None if using config-based path)
+    ref_path_str = str(reference_path) if args.reference else None
+    converter = AIDocumentConverter(ref_path_str, config_path=args.config)
     success = converter.convert_with_ai(input_file, output_file)
     
     sys.exit(0 if success else 1)

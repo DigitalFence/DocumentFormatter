@@ -14,6 +14,8 @@ class FormatterConfig:
     """Manages formatter configuration with defaults and overrides."""
     
     DEFAULT_CONFIG = {
+        "external_reference_folder": None,
+        "reference_template": "referenceformat.docx",
         "heading_overrides": {},
         "heading_detection": {
             "section_keywords": ["section", "part"],
@@ -205,26 +207,87 @@ class FormatterConfig:
         """Get blockquote formatting settings."""
         return self.config.get("blockquote_formatting", {})
     
+    def resolve_reference_file(self, filename: str) -> Optional[Path]:
+        """Resolve path to a reference file (template or symbols).
+
+        Looks in the following order:
+        1. External reference folder (if configured)
+        2. Local References/ folder
+        3. Script directory
+
+        Args:
+            filename: Name of the reference file (e.g., "referenceformat.docx", "Symbols.docx")
+
+        Returns:
+            Path to the file if found, None otherwise
+        """
+        script_dir = Path(__file__).parent
+
+        # Check external reference folder first
+        external_folder = self.config.get("external_reference_folder")
+        if external_folder:
+            external_path = Path(external_folder) / filename
+            if external_path.exists():
+                return external_path
+
+        # Check local References folder
+        local_ref_path = script_dir / "References" / filename
+        if local_ref_path.exists():
+            return local_ref_path
+
+        # Check script directory
+        script_path = script_dir / filename
+        if script_path.exists():
+            return script_path
+
+        return None
+
+    def get_reference_template_path(self) -> Optional[Path]:
+        """Get path to the reference template document.
+
+        Returns:
+            Path to referenceformat.docx if found, None otherwise
+        """
+        template_name = self.config.get("reference_template", "referenceformat.docx")
+        return self.resolve_reference_file(template_name)
+
+    def get_symbols_file_path(self) -> Optional[Path]:
+        """Get path to the symbols document.
+
+        Returns:
+            Path to Symbols.docx if found, None otherwise
+        """
+        separator_config = self.config.get("chapter_separator", {})
+        symbol_source = separator_config.get("symbol_source")
+
+        if not symbol_source:
+            return None
+
+        # If symbol_source is an absolute path, use it directly
+        symbol_path = Path(symbol_source)
+        if symbol_path.is_absolute() and symbol_path.exists():
+            return symbol_path
+
+        # Otherwise, resolve it using the folder hierarchy
+        return self.resolve_reference_file(symbol_source)
+
     def get_chapter_separator(self) -> Dict[str, Any]:
         """Get chapter separator settings with resolved symbol or image."""
         settings = self.config.get("chapter_separator", {}).copy()
-        
+
         # If a symbol source is specified, try to extract image from it
         if settings.get("symbol_source") and settings.get("enabled"):
             try:
-                # Import alias resolver if available
-                try:
-                    from alias_resolver import resolve_path
-                    symbol_path = resolve_path(settings["symbol_source"])
-                except ImportError:
-                    symbol_path = settings["symbol_source"]
-                    
+                # Use the new path resolution method
+                symbol_path = self.get_symbols_file_path()
+                if not symbol_path:
+                    return settings
+
                 from image_extractor import extract_first_image
-                
+
                 # Additional check if file exists and is readable
-                from pathlib import Path
-                if Path(symbol_path).exists():
-                    result = extract_first_image(symbol_path)
+                if symbol_path.exists():
+                    result = extract_first_image(str(symbol_path))
                     if result:
                         image_data, width, height = result
                         settings["image_data"] = image_data
