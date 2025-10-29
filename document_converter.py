@@ -599,18 +599,25 @@ class DocumentConverter:
         # Store reference path for template use
         self.reference_doc_path = reference_doc_path
         resolved_path = resolve_path(reference_doc_path)
-        
+
         # Check if we should use formatter config
         # For now, always load config for behavioral rules (page breaks, chapter detection)
         # but only apply style overrides if USE_FORMATTER_CONFIG=1
         self.use_config = os.environ.get('USE_FORMATTER_CONFIG', '0') == '1'
         self.always_use_behavioral_config = True  # Always use config for page breaks, chapter detection
-        
-        # Use reference document as template to preserve all styles
-        print(f"Using template approach with reference: {resolved_path}")
+
+        # Always load config first for behavioral rules and external folder info
+        if FormatterConfig:
+            self.config = FormatterConfig(config_path)
+        else:
+            self.config = None
+
+        # Display detailed template information
+        self._log_template_details(resolved_path)
 
         # Handle .dotx template files (python-docx rejects .dotx content-type by default)
         if resolved_path.endswith('.dotx'):
+            print(f"ℹ️  Converting .dotx template to .docx format...")
             # Convert .dotx to .docx by modifying content-type in the ZIP
             import zipfile
             import tempfile
@@ -645,6 +652,7 @@ class DocumentConverter:
 
                 # Now open the converted file
                 self.output_doc = Document(temp_path)
+                print(f"✓ Template format conversion complete")
             finally:
                 # Clean up temp file
                 try:
@@ -653,16 +661,15 @@ class DocumentConverter:
                     pass
         else:
             self.output_doc = Document(resolved_path)
-        
+
+        # Log template loading success
+        print(f"✓ Template loaded successfully")
+        print(f"Styles available: {len(self.output_doc.styles)}")
+
         # Clear all content from template while preserving styles
         self._clear_template_content()
-        
-        # Always load config for behavioral rules
-        if FormatterConfig:
-            self.config = FormatterConfig(config_path)
-        else:
-            self.config = None
-        
+        print("Template content cleared, styles preserved\n")
+
         # Only extract styles if config is enabled (for style overrides)
         if self.use_config and self.config:
             self.style_extractor = StyleExtractor(reference_doc_path)
@@ -680,11 +687,11 @@ class DocumentConverter:
 
         # Track whether this is a book (with title/TOC) or single chapter
         self.is_book_with_title = False
-        
+
         # Track hierarchical list context
         self.in_hierarchical_list = False
         self.current_list_heading_level = None
-        
+
         # Track special sections for page breaks
         self.special_sections = {
             'title': False,
@@ -697,7 +704,57 @@ class DocumentConverter:
         # Track if we're currently in TOC section (to keep heading and content together)
         self.in_toc_section = False
         self.toc_content_started = False
-    
+
+    def _log_template_details(self, resolved_path: str):
+        """Log detailed information about the template file being used."""
+        from datetime import datetime
+
+        print(f"\n{'='*60}")
+        print(f"📄 TEMPLATE FILE DETAILS")
+        print(f"{'='*60}")
+
+        # File path and name
+        template_path = Path(resolved_path)
+        print(f"File: {template_path.name}")
+        print(f"Full Path: {resolved_path}")
+
+        # Determine source location
+        external_folder = None
+        if self.config:
+            try:
+                external_folder = self.config.config.get("external_reference_folder")
+            except:
+                external_folder = None
+
+        if external_folder and str(resolved_path).startswith(str(external_folder)):
+            print(f"Source: External Reference Folder")
+            print(f"        ({external_folder})")
+        elif "References/" in str(resolved_path) or "/References/" in str(resolved_path):
+            print(f"Source: Local References Folder")
+        else:
+            print(f"Source: Script Directory")
+
+        # File properties
+        try:
+            stat = os.stat(resolved_path)
+            file_size_kb = stat.st_size / 1024
+            modified_time = datetime.fromtimestamp(stat.st_mtime)
+
+            print(f"Size: {file_size_kb:.2f} KB")
+            print(f"Modified: {modified_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        except Exception as e:
+            print(f"Size: Unable to read ({e})")
+
+        # File type
+        if resolved_path.endswith('.dotx'):
+            print(f"Type: .dotx (Word Template)")
+        elif resolved_path.endswith('.docx'):
+            print(f"Type: .docx (Word Document)")
+        else:
+            print(f"Type: {template_path.suffix}")
+
+        print(f"{'='*60}\n")
+
     def _clear_template_content(self):
         """Clear all content from the template document while preserving styles."""
         # Clear all paragraphs from the document

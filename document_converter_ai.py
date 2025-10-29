@@ -864,8 +864,13 @@ Text to convert:
                 validation_passed = self._validate_no_hallucination(text_content, result)
                 if not validation_passed:
                     if self.show_progress or self.debug:
-                        print(f"⚠️  VALIDATION FAILED: AI may have added content")
-                        print(f"   Falling back to simple conversion for safety")
+                        print(f"\n{'!'*60}")
+                        print(f"⚠️  ALERT: AI VALIDATION FAILED")
+                        print(f"{'!'*60}")
+                        print(f"Issue: AI may have added or fabricated content")
+                        print(f"Action: Falling back to rule-based text conversion")
+                        print(f"Result: Original content will be preserved exactly")
+                        print(f"{'!'*60}\n")
                     return None  # Fall back to simple conversion
 
             return result if success else None
@@ -936,7 +941,8 @@ Text to convert:
             else:
                 # Fallback to simple conversion for this chunk
                 if self.show_progress:
-                    print(f"   ⚠️ Chunk {i+1} failed, using simple conversion")
+                    print(f"   ⚠️ Chunk {i+1}/{len(chunks)} failed")
+                    print(f"   → Using rule-based conversion for this section")
                 # Only first chunk can have H1 headings
                 is_first_chunk = (i == 0)
                 markdown_chunks.append(self._simple_text_to_markdown(chunk, is_first_chunk=is_first_chunk))
@@ -975,8 +981,13 @@ Text to convert:
 
         if not validation_passed:
             if self.show_progress or self.debug:
-                print(f"⚠️  VALIDATION FAILED: AI may have added content")
-                print(f"   Falling back to simple conversion for safety")
+                print(f"\n{'!'*60}")
+                print(f"⚠️  ALERT: AI VALIDATION FAILED")
+                print(f"{'!'*60}")
+                print(f"Issue: AI output contains fabricated or added content")
+                print(f"Action: Falling back to rule-based text conversion")
+                print(f"Result: Original content will be preserved exactly")
+                print(f"{'!'*60}\n")
             # Fall back to simple conversion
             return None
 
@@ -1060,11 +1071,20 @@ Text to convert:
                 else:
                     # Fallback to simple conversion
                     if self.show_progress:
-                        print(f"⚡ Falling back to simple text conversion")
-                        print(f"   Reason: All AI attempts failed")
+                        print(f"\n{'='*60}")
+                        print(f"⚡ USING RULE-BASED TEXT CONVERSION")
+                        print(f"{'='*60}")
+                        print(f"Reason: AI analysis unavailable or failed")
+                        print(f"Method: Rule-based markdown formatting")
+                        print(f"Note: Original content preserved, basic formatting applied")
+                        print(f"{'='*60}\n")
                     else:
+                        print(f"\n{'='*60}")
+                        print(f"⚡ USING RULE-BASED TEXT CONVERSION")
+                        print(f"{'='*60}")
                         print(f"AI analysis unavailable")
-                        print("Using simple text conversion...")
+                        print(f"Applying rule-based text-to-markdown formatting...")
+                        print(f"{'='*60}\n")
                     markdown_content = self._simple_text_to_markdown(text_content)
                     use_ai = False
             else:
