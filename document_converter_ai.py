@@ -9,6 +9,8 @@ import os
 import subprocess
 import tempfile
 import json
+import time
+import datetime
 from pathlib import Path
 from typing import Optional, Tuple
 from document_converter import DocumentConverter
@@ -370,14 +372,16 @@ Text to convert:
             
         try:
             # Show progress if enabled
+            start_time = time.time()
             if self.show_progress:
                 print(f"🤖 Using Claude {model.upper()} model for AI analysis...")
+                print(f"🕐 Started: {datetime.datetime.now().strftime('%H:%M:%S')}")
             elif self.debug:
                 print(f"Calling Claude ({model}) for text analysis...")
-            
+
             # Use explicit Claude path if provided, otherwise use 'claude' from PATH
             claude_cmd = os.environ.get('CLAUDE_CLI_PATH', 'claude')
-            
+
             # Use Claude in print mode for non-interactive output
             result = subprocess.run(
                 [claude_cmd, '--model', model, '--print', prompt],
@@ -385,6 +389,8 @@ Text to convert:
                 text=True,
                 timeout=self.timeout
             )
+
+            elapsed = time.time() - start_time
             
             if result.returncode == 0 and result.stdout.strip():
                 output = result.stdout.strip()
@@ -422,8 +428,9 @@ Text to convert:
                 
                 if self.show_progress:
                     print("✓ AI analysis completed successfully")
+                    print(f"⏱️  Elapsed: {elapsed:.1f}s")
                 elif self.debug:
-                    print("Claude analysis successful")
+                    print(f"Claude analysis successful (took {elapsed:.1f}s)")
                 return True, output
             else:
                 error_msg = result.stderr or "Unknown error"
@@ -898,54 +905,65 @@ Text to convert:
         Returns:
             True if validation passes, False if hallucination detected
         """
+        # Check if validation is enabled in config (default: enabled)
+        validation_enabled = self.config.config.get('ai_validation', {}).get('enabled', True)
+
+        if not validation_enabled:
+            if self.debug:
+                print(f"⚠️  AI validation disabled via configuration")
+            return True
+
         import re
 
+        # Get validation settings from config
+        check_dialogue = self.config.config.get('ai_validation', {}).get('check_dialogue', True)
+        check_length_ratio = self.config.config.get('ai_validation', {}).get('check_length_ratio', True)
+        check_suspicious_speakers = self.config.config.get('ai_validation', {}).get('check_suspicious_speakers', True)
+        max_length_ratio = self.config.config.get('ai_validation', {}).get('max_length_ratio', 1.2)
+        dialogue_tolerance = self.config.config.get('ai_validation', {}).get('dialogue_tolerance', 1.5)
+
         # Strip markdown formatting to get raw text for comparison
-        # Remove markdown symbols: #, *, >, _, etc.
         def strip_markdown(text):
             """Remove markdown formatting symbols"""
-            # Remove headings (#)
             text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-            # Remove blockquotes (>)
             text = re.sub(r'^>\s*', '', text, flags=re.MULTILINE)
-            # Remove bold/italic markers (**, *, _)
             text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
             text = re.sub(r'\*([^*]+)\*', r'\1', text)
             text = re.sub(r'_([^_]+)_', r'\1', text)
-            # Remove list markers (-, *, •)
             text = re.sub(r'^\s*[-*•]\s+', '', text, flags=re.MULTILINE)
-            # Remove code blocks
             text = re.sub(r'```[^`]*```', '', text, flags=re.DOTALL)
-            # Remove inline code
             text = re.sub(r'`([^`]+)`', r'\1', text)
             return text.strip()
 
-        # Check 2: Detect dialogue patterns BEFORE stripping markdown
-        # Look for patterns like "**Name**: dialogue" or "Name: dialogue"
-        dialogue_pattern = r'^\*\*[A-Z][a-zA-Z\s]+\*\*:\s*.+$'
-        dialogue_lines = re.findall(dialogue_pattern, markdown_output, re.MULTILINE)
-        dialogue_count_in_original = len(re.findall(dialogue_pattern, original_text, re.MULTILINE))
+        # Check 2: Detect dialogue patterns
+        # FIX: Use different patterns for input (plain text) vs output (markdown with bold)
+        if check_dialogue:
+            # Pattern for markdown output with bold formatting: **Name**: text
+            bold_dialogue_pattern = r'^\*\*[A-Z][a-zA-Z\s]+\*\*:\s*.+$'
+            # Pattern for plain text input: Name: text (no bold markers)
+            plain_dialogue_pattern = r'^[A-Z][a-zA-Z\s]+:\s+.+$'
 
-        # Now strip markdown for length comparison
+            dialogue_lines = re.findall(bold_dialogue_pattern, markdown_output, re.MULTILINE)
+            dialogue_count_in_original = len(re.findall(plain_dialogue_pattern, original_text, re.MULTILINE))
+
+        # Calculate lengths for ratio check
         original_stripped = strip_markdown(original_text)
         output_stripped = strip_markdown(markdown_output)
-
-        # Calculate lengths
         original_len = len(original_stripped)
         output_len = len(output_stripped)
-
-        # Check 1: Output significantly longer than input (>20% growth suggests added content)
         length_ratio = output_len / original_len if original_len > 0 else 0
-        if length_ratio > 1.2:
+
+        # Check 1: Output significantly longer than input
+        if check_length_ratio and length_ratio > max_length_ratio:
             if self.debug or self.show_progress:
                 print(f"⚠️  WARNING: Output is {length_ratio:.1%} the size of input")
                 print(f"   Original: {original_len} chars, Output: {output_len} chars")
                 print(f"   This may indicate AI added content not in the original")
 
         # Check if we found significant dialogue in output
-        if len(dialogue_lines) > 5:
+        if check_dialogue and len(dialogue_lines) > 5:
             # Found multiple dialogue lines - check if they exist in original
-            if len(dialogue_lines) > dialogue_count_in_original * 1.5:
+            if len(dialogue_lines) > dialogue_count_in_original * dialogue_tolerance:
                 if self.debug or self.show_progress:
                     print(f"⚠️  WARNING: Detected {len(dialogue_lines)} dialogue lines in output")
                     print(f"   Original had {dialogue_count_in_original} dialogue lines")
@@ -953,28 +971,30 @@ Text to convert:
                 return False
 
         # Check 3: Look for common speaker names that might be hallucinated
-        suspicious_speakers = ['questioner', 'student', 'disciple', 'seeker', 'interviewer']
-        found_suspicious = []
+        if check_suspicious_speakers:
+            suspicious_speakers = ['questioner', 'student', 'disciple', 'seeker', 'interviewer']
+            found_suspicious = []
 
-        for speaker in suspicious_speakers:
-            pattern = rf'\*\*{speaker}\*\*:'.lower()
-            if pattern in markdown_output.lower():
-                # Check if this speaker also exists in original
-                if pattern not in original_text.lower():
-                    found_suspicious.append(speaker.title())
+            for speaker in suspicious_speakers:
+                pattern = rf'\*\*{speaker}\*\*:'.lower()
+                if pattern in markdown_output.lower():
+                    # Check if this speaker also exists in original (without bold)
+                    plain_speaker = f"{speaker}:".lower()
+                    if plain_speaker not in original_text.lower():
+                        found_suspicious.append(speaker.title())
 
-        if found_suspicious:
-            if self.debug or self.show_progress:
-                print(f"⚠️  WARNING: Found dialogue with speaker(s) not in original:")
-                for speaker in found_suspicious:
-                    print(f"   - {speaker}")
-                print(f"   AI may have fabricated dialogue - please review output carefully")
-            return False
+            if found_suspicious:
+                if self.debug or self.show_progress:
+                    print(f"⚠️  WARNING: Found dialogue with speaker(s) not in original:")
+                    for speaker in found_suspicious:
+                        print(f"   - {speaker}")
+                    print(f"   AI may have fabricated dialogue - please review output carefully")
+                return False
 
         # Validation passed
         if self.debug:
             print(f"✓ Validation passed: No obvious hallucination detected")
-            print(f"  Length ratio: {length_ratio:.1%}, Dialogue lines: {len(dialogue_lines)}")
+            print(f"  Length ratio: {length_ratio:.1%}, Dialogue lines: {len(dialogue_lines) if check_dialogue else 'N/A'}")
 
         return True
 
@@ -1155,9 +1175,11 @@ Text to convert:
         # Process each chunk with full retry strategy
         markdown_chunks = []
         for i, chunk in enumerate(chunks):
+            chunk_start_time = time.time()
             if self.show_progress:
                 print(f"\n{'='*60}")
                 print(f"📦 PROCESSING CHUNK {i+1} of {len(chunks)}")
+                print(f"🕐 Chunk started at {datetime.datetime.now().strftime('%H:%M:%S')}")
                 print(f"{'='*60}\n")
 
             # Send notification for chunk progress
@@ -1186,9 +1208,12 @@ Text to convert:
             # Use full retry strategy for each chunk (prioritize quality)
             result = self._attempt_ai_conversion_with_retries(chunk, toc_chapters)
 
+            chunk_elapsed = time.time() - chunk_start_time
             if result:
                 # AI conversion succeeded with validation
                 markdown_chunks.append(result)
+                if self.show_progress:
+                    print(f"✓ Chunk {i+1}/{len(chunks)} completed in {chunk_elapsed:.1f}s ({chunk_elapsed/60:.1f}min)")
             else:
                 # All AI attempts failed for this chunk - use simple conversion as last resort
                 if self.show_progress:
@@ -1200,6 +1225,8 @@ Text to convert:
                 # Only first chunk can have H1 headings
                 is_first_chunk = (i == 0)
                 markdown_chunks.append(self._simple_text_to_markdown(chunk, is_first_chunk=is_first_chunk))
+                if self.show_progress:
+                    print(f"✓ Chunk {i+1}/{len(chunks)} completed (rule-based) in {chunk_elapsed:.1f}s")
         
         # Send completion notification for chunked processing
         if len(chunks) > 1:
@@ -1272,18 +1299,26 @@ Text to convert:
             if input_path.suffix.lower() == '.rtf':
                 # Read RTF file and extract plain text
                 try:
+                    if self.show_progress:
+                        print(f"📖 Reading RTF file...")
                     with open(input_path, 'r', encoding='utf-8') as f:
                         rtf_content = f.read()
+                    if self.show_progress:
+                        print(f"📝 Extracting text from RTF...")
                     text_content = rtf_to_text(rtf_content)
-                    if self.debug:
-                        print(f"Extracted text from RTF: {len(text_content)} characters")
+                    if self.show_progress or self.debug:
+                        print(f"✓ Extracted text from RTF: {len(text_content)} characters")
                 except Exception as e:
                     print(f"❌ Error reading RTF file: {e}")
                     return False
             else:
                 # Read regular text files
+                if self.show_progress:
+                    print(f"📖 Reading text file...")
                 with open(input_path, 'r', encoding='utf-8') as f:
                     text_content = f.read()
+                if self.show_progress:
+                    print(f"✓ Read {len(text_content)} characters")
             
             if not text_content.strip():
                 print(f"❌ Error: Input file is empty: {input_path}")

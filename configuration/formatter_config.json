@@ -160,5 +160,14 @@
     "spacing_before": 12,
     "spacing_after": 12,
     "font_size": 14
+  },
+  "ai_validation": {
+    "enabled": true,
+    "comment": "Enable validation to detect AI hallucinations and fabricated content",
+    "check_dialogue": true,
+    "check_length_ratio": true,
+    "check_suspicious_speakers": true,
+    "max_length_ratio": 1.2,
+    "dialogue_tolerance": 1.5
   }
 }
