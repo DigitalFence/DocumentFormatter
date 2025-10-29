@@ -189,6 +189,12 @@ UNIVERSAL FORMATTING RULES (apply to ALL):
    - Preserve the natural hierarchy of the content
    - Headings should NOT end with periods, question marks, or exclamation points
    - Keep headings concise (not full sentences)
+   - ⚠️ DETECT DESCRIPTIVE SECTION HEADINGS:
+     - Look for standalone paragraphs that set scene/time/location
+     - Examples: "A Week Later, Before Dawn at...", "The Next Morning", "Three Days Later"
+     - These typically appear AFTER opening quotes/sutras and BEFORE narrative content
+     - Format as ## (H2) even if they're complete phrases/sentences
+     - Example: "A Week Later, Before Dawn at Kanha Shantivanam" → ## A Week Later, Before Dawn at Kanha Shantivanam
 
 2. LISTS:
    - Detect lists (both bulleted and numbered) and format appropriately
@@ -241,13 +247,21 @@ UNIVERSAL FORMATTING RULES (apply to ALL):
 
 9. SPECIAL FORMATTING FOR OPENING QUOTES (sutras, epigraphs, etc.):
    - Detect Sanskrit/spiritual quotes at the beginning of sections/chapters
-   - Format as centered blockquotes with this pattern:
-     > *Sanskrit transliteration in italics*
+   - ⚠️ CRITICAL: Do NOT add labels like "Sanskrit:", "Transliteration:", "Translation:"
+   - Format ONLY the actual text content without any labels
+   - Pattern for formatting (without labels):
+     > *sanskrit text in devanagari or transliteration*
      > English translation
-     > — Source citation (always start with em dash)
+     > — Source citation (if present, always start with em dash)
    - Use > for blockquote with single line breaks
-   - The transliteration should be italicized
+   - The transliteration/sanskrit should be italicized
    - ALWAYS use em dash (—) before attribution/source, not hyphen (-)
+   - Example CORRECT:
+     > *yo viviktasthanaṁ sevate*
+     > Someone who worships alone...
+   - Example WRONG:
+     > *Transliteration: yo viviktasthanaṁ sevate*
+     > Translation: Someone who worships alone...
 
 10. SPECIAL FORMATTING FOR HIERARCHICAL LISTS (roles, principles, qualities, etc.):
    - Look for patterns like "Transformational Roles", "Meta Roles", "Principles", "Types", "Aspects", etc.
