@@ -58,9 +58,66 @@ class AIDocumentConverter:
         self.timeout = int(os.environ.get('CLAUDE_TIMEOUT', '600'))  # Default: 600 seconds (10 minutes)
         self.enable_haiku_fallback = os.environ.get('ENABLE_HAIKU_FALLBACK', '1') == '1'  # Default: enabled
     
-    def _create_analysis_prompt(self, text_content: str) -> str:
-        """Create the prompt for Claude to analyze and structure text."""
+    def _create_analysis_prompt(self, text_content: str, toc_chapters: list = None) -> str:
+        """Create the prompt for Claude to analyze and structure text.
+
+        Args:
+            text_content: The text to convert to markdown
+            toc_chapters: List of chapter names extracted from TOC (if present)
+        """
+        # Build TOC-specific instructions if chapters were detected
+        toc_instructions = ""
+        if toc_chapters and len(toc_chapters) > 0:
+            chapter_list = "\n".join(f"  - {ch}" for ch in toc_chapters)
+            toc_instructions = f"""
+📚 TABLE OF CONTENTS DETECTED:
+The document contains these chapters (from TOC):
+{chapter_list}
+
+CRITICAL: Use THESE chapter names for H1 headings.
+- Do NOT create different chapter names
+- Do NOT add chapters not in this list
+- Do NOT invent additional chapters
+- Use EXACT names from TOC
+"""
+        else:
+            toc_instructions = """
+📄 SINGLE CHAPTER/DOCUMENT FORMAT (No TOC detected):
+- Use H1 for the main chapter/talk/article title ONLY
+- Use H2 for major sections within the chapter
+- Use H3 for subsections
+- Do NOT invent multiple chapters
+- Treat this as ONE cohesive document
+"""
+
         return f"""Convert the following plain text to well-structured markdown format.
+
+🚨 ABSOLUTELY CRITICAL - ZERO TOLERANCE RULES - READ FIRST:
+
+1. ⛔ NEVER INVENT, ADD, OR FABRICATE ANY CONTENT
+   - Do NOT create dialogue that doesn't exist in the original
+   - Do NOT add characters, names, speakers, or people not in original
+   - Do NOT expand, elaborate, paraphrase, or "improve" the text
+   - Do NOT write what you think should be there
+   - Do NOT add your own interpretations or explanations
+   - ONLY format what IS ACTUALLY in the original text
+   - IF YOU ADD EVEN ONE SENTENCE NOT IN THE ORIGINAL, YOU HAVE COMPLETELY FAILED
+
+2. ✅ YOUR ONLY JOB: ADD MARKDOWN FORMATTING SYMBOLS
+   - Add # ## ### for headings (only to text that's already there)
+   - Add * for italics (only around non-English text already there)
+   - Add > for blockquotes (only around quoted text already there)
+   - Add markdown list formatting to lists already there
+   - DO NOT CHANGE, REARRANGE, OR ADD ANY ACTUAL WORDS OR SENTENCES
+   - Every sentence in your output must exist in the input
+
+3. ⚠️ VERIFICATION: Before outputting, ask yourself:
+   - "Is EVERY sentence in my output present in the original?"
+   - "Did I invent ANY dialogue, characters, or content?"
+   - "Am I ONLY adding markdown symbols to existing text?"
+   - If answer is NO to any question, START OVER
+
+{toc_instructions}
 
 CRITICAL: Chapters use IDENTICAL formatting whether in a book or standalone!
 
@@ -480,6 +537,168 @@ Text to convert:
 
         return markdown_content
 
+    def _extract_toc_chapters(self, text_content: str) -> list:
+        """
+        Extract chapter names from Table of Contents if present.
+
+        Args:
+            text_content: The full text content to search for TOC
+
+        Returns:
+            List of chapter names found in TOC, or empty list if no TOC
+        """
+        import re
+
+        # Find TOC section - look for common TOC headers
+        toc_patterns = [
+            r'(?i)(table\s+of\s+contents|contents|index)(.*?)(?=\n\n[A-Z#]|\Z)',
+            r'(?i)^(toc)\s*$\n(.*?)(?=\n\n[A-Z#]|\Z)'
+        ]
+
+        chapters = []
+        for pattern in toc_patterns:
+            match = re.search(pattern, text_content, re.DOTALL | re.MULTILINE)
+            if match:
+                toc_text = match.group(2) if len(match.groups()) > 1 else match.group(1)
+
+                if self.debug:
+                    print(f"📚 Found TOC section: {len(toc_text)} characters")
+
+                # Extract chapter names - look for various patterns:
+                # 1. "Chapter X: Name" or "Chapter X - Name"
+                # 2. Numbered lines "1. Name" or "1 Name"
+                # 3. Standalone capitalized lines (potential chapter names)
+
+                # Pattern 1: Explicit "Chapter" keyword
+                chapter_matches = re.findall(
+                    r'(?i)chapter\s+\d+[:\-\s]+([^\n]{5,80})',
+                    toc_text
+                )
+                chapters.extend([m.strip() for m in chapter_matches])
+
+                # Pattern 2: Numbered items (1. Something, 2. Something)
+                if not chapters:
+                    numbered_matches = re.findall(
+                        r'^\s*\d+[\.\)]\s+([A-Z][^\n]{10,80})$',
+                        toc_text,
+                        re.MULTILINE
+                    )
+                    chapters.extend([m.strip() for m in numbered_matches])
+
+                # Pattern 3: Lines that look like titles (all caps or title case, standalone)
+                if not chapters:
+                    title_matches = re.findall(
+                        r'^([A-Z][A-Z\s]{10,80})$|^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){2,})$',
+                        toc_text,
+                        re.MULTILINE
+                    )
+                    for match in title_matches:
+                        title = next((x for x in match if x), None)
+                        if title:
+                            chapters.append(title.strip())
+
+                if chapters:
+                    if self.debug or self.show_progress:
+                        print(f"   ✓ Extracted {len(chapters)} chapters from TOC")
+                        for i, ch in enumerate(chapters[:5], 1):
+                            print(f"      {i}. {ch}")
+                        if len(chapters) > 5:
+                            print(f"      ... and {len(chapters) - 5} more")
+                    break
+
+        return chapters
+
+    def _validate_no_hallucination(self, original_text: str, markdown_output: str) -> bool:
+        """
+        Validate that AI didn't hallucinate or add content.
+
+        Args:
+            original_text: The original input text
+            markdown_output: The AI-generated markdown output
+
+        Returns:
+            True if validation passes, False if hallucination detected
+        """
+        import re
+
+        # Strip markdown formatting to get raw text for comparison
+        # Remove markdown symbols: #, *, >, _, etc.
+        def strip_markdown(text):
+            """Remove markdown formatting symbols"""
+            # Remove headings (#)
+            text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+            # Remove blockquotes (>)
+            text = re.sub(r'^>\s*', '', text, flags=re.MULTILINE)
+            # Remove bold/italic markers (**, *, _)
+            text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+            text = re.sub(r'\*([^*]+)\*', r'\1', text)
+            text = re.sub(r'_([^_]+)_', r'\1', text)
+            # Remove list markers (-, *, •)
+            text = re.sub(r'^\s*[-*•]\s+', '', text, flags=re.MULTILINE)
+            # Remove code blocks
+            text = re.sub(r'```[^`]*```', '', text, flags=re.DOTALL)
+            # Remove inline code
+            text = re.sub(r'`([^`]+)`', r'\1', text)
+            return text.strip()
+
+        # Check 2: Detect dialogue patterns BEFORE stripping markdown
+        # Look for patterns like "**Name**: dialogue" or "Name: dialogue"
+        dialogue_pattern = r'^\*\*[A-Z][a-zA-Z\s]+\*\*:\s*.+$'
+        dialogue_lines = re.findall(dialogue_pattern, markdown_output, re.MULTILINE)
+        dialogue_count_in_original = len(re.findall(dialogue_pattern, original_text, re.MULTILINE))
+
+        # Now strip markdown for length comparison
+        original_stripped = strip_markdown(original_text)
+        output_stripped = strip_markdown(markdown_output)
+
+        # Calculate lengths
+        original_len = len(original_stripped)
+        output_len = len(output_stripped)
+
+        # Check 1: Output significantly longer than input (>20% growth suggests added content)
+        length_ratio = output_len / original_len if original_len > 0 else 0
+        if length_ratio > 1.2:
+            if self.debug or self.show_progress:
+                print(f"⚠️  WARNING: Output is {length_ratio:.1%} the size of input")
+                print(f"   Original: {original_len} chars, Output: {output_len} chars")
+                print(f"   This may indicate AI added content not in the original")
+
+        # Check if we found significant dialogue in output
+        if len(dialogue_lines) > 5:
+            # Found multiple dialogue lines - check if they exist in original
+            if len(dialogue_lines) > dialogue_count_in_original * 1.5:
+                if self.debug or self.show_progress:
+                    print(f"⚠️  WARNING: Detected {len(dialogue_lines)} dialogue lines in output")
+                    print(f"   Original had {dialogue_count_in_original} dialogue lines")
+                    print(f"   AI may have fabricated dialogue - please review output carefully")
+                return False
+
+        # Check 3: Look for common speaker names that might be hallucinated
+        suspicious_speakers = ['questioner', 'student', 'disciple', 'seeker', 'interviewer']
+        found_suspicious = []
+
+        for speaker in suspicious_speakers:
+            pattern = rf'\*\*{speaker}\*\*:'.lower()
+            if pattern in markdown_output.lower():
+                # Check if this speaker also exists in original
+                if pattern not in original_text.lower():
+                    found_suspicious.append(speaker.title())
+
+        if found_suspicious:
+            if self.debug or self.show_progress:
+                print(f"⚠️  WARNING: Found dialogue with speaker(s) not in original:")
+                for speaker in found_suspicious:
+                    print(f"   - {speaker}")
+                print(f"   AI may have fabricated dialogue - please review output carefully")
+            return False
+
+        # Validation passed
+        if self.debug:
+            print(f"✓ Validation passed: No obvious hallucination detected")
+            print(f"  Length ratio: {length_ratio:.1%}, Dialogue lines: {len(dialogue_lines)}")
+
+        return True
+
     def _simple_text_to_markdown(self, text_content: str, is_first_chunk: bool = True) -> str:
         """
         Simple fallback conversion from text to markdown.
@@ -622,11 +841,14 @@ Text to convert:
     
     def _process_in_chunks(self, text_content: str, chunk_size: int = 20000) -> str:
         """Process large text in chunks and reassemble."""
+        # Extract TOC chapters first (if present)
+        toc_chapters = self._extract_toc_chapters(text_content)
+
         if len(text_content) <= chunk_size:
             # Small enough to process in one go
-            prompt = self._create_analysis_prompt(text_content)
+            prompt = self._create_analysis_prompt(text_content, toc_chapters)
             success, result = self._call_claude(prompt)
-            
+
             # Try Haiku if initial model times out
             if not success and "timed out" in result and self.enable_haiku_fallback and self.model != 'haiku':
                 if self.show_progress:
@@ -634,7 +856,18 @@ Text to convert:
                 success, result = self._call_claude(prompt, 'haiku')
                 if success:
                     self.model = 'haiku'
-            
+
+            # Validate result if successful
+            if success:
+                if self.show_progress:
+                    print(f"🔍 Validating AI output for hallucinations...")
+                validation_passed = self._validate_no_hallucination(text_content, result)
+                if not validation_passed:
+                    if self.show_progress or self.debug:
+                        print(f"⚠️  VALIDATION FAILED: AI may have added content")
+                        print(f"   Falling back to simple conversion for safety")
+                    return None  # Fall back to simple conversion
+
             return result if success else None
         
         # Split into chunks at paragraph boundaries
@@ -689,10 +922,10 @@ Text to convert:
                     ], capture_output=True, timeout=1)
             except:
                 pass  # Silently fail if notification fails
-            
-            prompt = self._create_analysis_prompt(chunk)
+
+            prompt = self._create_analysis_prompt(chunk, toc_chapters)
             success, result = self._call_claude(prompt)
-            
+
             if not success and "timed out" in result and self.enable_haiku_fallback:
                 if self.show_progress:
                     print(f"   🔄 Retrying chunk {i+1} with Haiku...")
@@ -734,6 +967,18 @@ Text to convert:
         
         # Reassemble the markdown
         markdown_content = '\n\n'.join(markdown_chunks)
+
+        # Validate final output for hallucinations
+        if self.show_progress:
+            print(f"🔍 Validating final output for hallucinations...")
+        validation_passed = self._validate_no_hallucination(text_content, markdown_content)
+
+        if not validation_passed:
+            if self.show_progress or self.debug:
+                print(f"⚠️  VALIDATION FAILED: AI may have added content")
+                print(f"   Falling back to simple conversion for safety")
+            # Fall back to simple conversion
+            return None
 
         # Post-process to remove duplicate H1 headings
         markdown_content = self._remove_duplicate_h1_headings(markdown_content)
