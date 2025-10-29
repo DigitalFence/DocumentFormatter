@@ -268,26 +268,32 @@ UNIVERSAL FORMATTING RULES (apply to ALL):
      > *transliteration...*
      > Translation...
    - Detect Sanskrit/spiritual quotes at the beginning of sections/chapters
-   - ⚠️ CRITICAL: Do NOT add labels like "Sanskrit:", "Transliteration:", "Translation:"
-   - Format ONLY the actual text content without any labels
-   - Pattern for formatting (without labels):
+   - ⚠️ CRITICAL: PRESERVE LABELS EXACTLY as they appear in the original
+   - If original has "Sanskrit: [text]", keep "Sanskrit: [text]" character-for-character
+   - If original has "Transliteration: [text]", keep "Transliteration: [text]" character-for-character
+   - If original has "Translation: [text]", keep "Translation: [text]" character-for-character
+   - Your ONLY job: Add > and * markdown formatting symbols to what's already there
+   - NEVER modify, rewrite, shorten, or substitute the actual Sanskrit/transliteration/translation content
+   - Pattern for formatting WITH labels (if present in original):
+     > Sanskrit: यो विविक्तस्थानं सेवते, यो लोकबन्धमुन्मूलयति, निस्त्रैगुण्यो भवति, योगक्षेमं त्यजति
+     > Transliteration: yo viviktasthanaṁ sevate yo lokabandhamunmûlayati nistraiguṇyo bhavati yogakṣemaṁ tyajati
+     > Translation: Someone who worships alone, lets go of worldly attachments, becomes free from the three gunas, and gives up material security is beyond illusion.
+   - Pattern for formatting WITHOUT labels (if not in original):
      > *devanagari text* (if present, italicize)
      > *transliteration text* (if present, also italicize)
      > English translation (plain text, no italics)
      > — Source citation (if present, always start with em dash)
    - Use > for blockquote with single line breaks
-   - Both Devanagari AND transliteration should be italicized when both exist
+   - Both Devanagari AND transliteration should be italicized when NO labels exist
    - ALWAYS use em dash (—) before attribution/source, not hyphen (-)
-   - Example CORRECT with both formats:
+   - Example CORRECT with labels (preserve exactly):
+     > Sanskrit: यो विविक्तस्थानं सेवते, यो लोकबन्धमुन्मूलयति, निस्त्रैगुण्यो भवति, योगक्षेमं त्यजति
+     > Transliteration: yo viviktasthanaṁ sevate yo lokabandhamunmûlayati nistraiguṇyo bhavati yogakṣemaṁ tyajati
+     > Translation: Someone who worships alone, lets go of worldly attachments, becomes free from the three gunas, and gives up material security is beyond illusion.
+   - Example CORRECT without labels (italicize):
      > *यो विविक्तस्थानं सेवते*
      > *yo viviktasthanaṁ sevate*
      > Someone who worships alone...
-   - Example CORRECT with transliteration only:
-     > *yo viviktasthanaṁ sevate*
-     > Someone who worships alone...
-   - Example WRONG (labels added):
-     > *Transliteration: yo viviktasthanaṁ sevate*
-     > Translation: Someone who worships alone...
 
 10. SPECIAL FORMATTING FOR HIERARCHICAL LISTS (roles, principles, qualities, etc.):
    - Look for patterns like "Transformational Roles", "Meta Roles", "Principles", "Types", "Aspects", etc.
