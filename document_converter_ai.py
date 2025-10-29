@@ -58,12 +58,13 @@ class AIDocumentConverter:
         self.timeout = int(os.environ.get('CLAUDE_TIMEOUT', '600'))  # Default: 600 seconds (10 minutes)
         self.enable_haiku_fallback = os.environ.get('ENABLE_HAIKU_FALLBACK', '1') == '1'  # Default: enabled
     
-    def _create_analysis_prompt(self, text_content: str, toc_chapters: list = None) -> str:
+    def _create_analysis_prompt(self, text_content: str, toc_chapters: list = None, ultra_strict: bool = False) -> str:
         """Create the prompt for Claude to analyze and structure text.
 
         Args:
             text_content: The text to convert to markdown
             toc_chapters: List of chapter names extracted from TOC (if present)
+            ultra_strict: If True, adds enhanced anti-hallucination warnings (for retry attempts)
         """
         # Build TOC-specific instructions if chapters were detected
         toc_instructions = ""
@@ -90,8 +91,46 @@ CRITICAL: Use THESE chapter names for H1 headings.
 - Treat this as ONE cohesive document
 """
 
-        return f"""Convert the following plain text to well-structured markdown format.
+        # Add ultra-strict warnings for retry attempts
+        ultra_strict_section = ""
+        if ultra_strict:
+            ultra_strict_section = """
 
+🔴🔴🔴 CRITICAL: ULTRA-STRICT MODE ENABLED 🔴🔴🔴
+
+This is a RETRY attempt because previous AI output FAILED validation.
+
+🚨 WHAT WENT WRONG PREVIOUSLY:
+- AI added dialogue that doesn't exist in original
+- AI created conversations between speakers
+- AI "improved" or "clarified" content by adding text
+- AI fabricated character names not in source
+
+⛔ ABSOLUTE PROHIBITIONS - THESE ARE FAILURES:
+1. Writing ANY speaker name not explicitly in the original
+2. Creating dialogue format (Speaker: text) when original doesn't have it
+3. Adding explanatory text "to help the reader"
+4. Expanding abbreviated content into full sentences
+5. "Inferring" what should be between paragraphs
+
+✅ YOUR ONLY ALLOWED ACTIONS:
+1. Add # or ## before text that's ALREADY a heading
+2. Add * around non-English text that's ALREADY there
+3. Add > before blockquotes that are ALREADY there
+4. NOTHING ELSE
+
+🔍 SELF-CHECK BEFORE SUBMITTING:
+□ Did I add ANY words not in the original? (If YES → FAIL)
+□ Did I create ANY dialogue format? (If YES → FAIL)
+□ Did I add ANY speaker names? (If YES → FAIL)
+□ Did I only add markdown symbols? (If NO → FAIL)
+
+⚠️ IF YOU'RE UNSURE: Just copy the text exactly and add ## before headings. That's it.
+
+"""
+
+        return f"""Convert the following plain text to well-structured markdown format.
+{ultra_strict_section}
 🚨 ABSOLUTELY CRITICAL - ZERO TOLERANCE RULES - READ FIRST:
 
 1. ⛔ NEVER INVENT, ADD, OR FABRICATE ANY CONTENT
@@ -608,6 +647,200 @@ Text to convert:
 
         return chapters
 
+    def _show_attempt_alert(self, config: dict):
+        """Display detailed alert for each AI conversion attempt."""
+        model_name = config['model'].upper()
+        attempt_num = config['attempt']
+        is_strict = config['strict']
+        total_attempts = 4
+
+        prompt_type = "ULTRA-STRICT (enhanced anti-hallucination rules)" if is_strict else "Standard (zero-tolerance rules)"
+
+        if self.show_progress or self.debug:
+            print(f"\n{'='*60}")
+            if attempt_num == 1:
+                print(f"🤖 AI CONVERSION - ATTEMPT {attempt_num} of {total_attempts}")
+            else:
+                retry_label = "RETRY" if attempt_num == 2 else ("MODEL SWITCH" if attempt_num == 3 else "FINAL AI ATTEMPT")
+                print(f"🔄 AI CONVERSION - ATTEMPT {attempt_num} of {total_attempts} ({retry_label})")
+            print(f"{'='*60}")
+            print(f"Model: Claude {model_name}")
+            print(f"Prompt: {prompt_type}")
+
+            if attempt_num == 1:
+                print(f"Strategy: Initial attempt with default settings")
+            elif attempt_num == 2:
+                print(f"Changes: Enhanced prompt with explicit red-flag examples")
+                print(f"Strategy: Same model, much stricter instructions")
+            elif attempt_num == 3:
+                print(f"Changes: Switched to most capable OPUS model")
+                print(f"Strategy: Higher capability model may better follow rules")
+                print(f"Note: This may take longer but should be more accurate")
+            elif attempt_num == 4:
+                print(f"Changes: Switched to faster HAIKU model")
+                print(f"Strategy: Sometimes simpler models follow rules better")
+                print(f"Note: This is the last AI attempt before rule-based fallback")
+
+            print(f"{'='*60}\n")
+
+    def _show_failure_alert(self, config: dict, validation_details: dict):
+        """Display detailed failure alert with next action."""
+        model_name = config['model'].upper()
+        attempt_num = config['attempt']
+        total_attempts = 4
+
+        if self.show_progress or self.debug:
+            print(f"\n{'!'*60}")
+            print(f"⚠️  ATTEMPT {attempt_num} FAILED - VALIDATION DETECTED ISSUES")
+            print(f"{'!'*60}")
+            print(f"Problem: AI added content not in original")
+            if 'dialogue_lines' in validation_details:
+                print(f"Details: Detected {validation_details['dialogue_lines']} dialogue lines (original had {validation_details['original_lines']})")
+            elif 'length_ratio' in validation_details:
+                print(f"Details: Output {validation_details['length_ratio']:.0%} the size of input")
+
+            if attempt_num < total_attempts:
+                if attempt_num == 1:
+                    print(f"Action: Retrying with stricter prompt on same model")
+                    print(f"Next: Attempt 2/4 with ULTRA-STRICT prompt")
+                elif attempt_num == 2:
+                    print(f"Action: Switching to more capable OPUS model")
+                    print(f"Next: Attempt 3/4 with OPUS + ULTRA-STRICT prompt")
+                elif attempt_num == 3:
+                    print(f"Action: Trying HAIKU model (faster, different approach)")
+                    print(f"Next: Attempt 4/4 with HAIKU + ULTRA-STRICT prompt")
+            else:
+                print(f"Action: All AI models exhausted, falling back to rule-based")
+
+            print(f"{'!'*60}\n")
+
+    def _show_success_alert(self, config: dict):
+        """Display success alert when validation passes."""
+        model_name = config['model'].upper()
+        attempt_num = config['attempt']
+        is_strict = config['strict']
+        prompt_type = "ULTRA-STRICT" if is_strict else "Standard"
+
+        if self.show_progress or self.debug:
+            print(f"\n{'='*60}")
+            print(f"✅ AI CONVERSION SUCCESSFUL - ATTEMPT {attempt_num} of 4")
+            print(f"{'='*60}")
+            print(f"Model: Claude {model_name}")
+            print(f"Prompt: {prompt_type}")
+            print(f"Validation: PASSED - No fabricated content detected")
+            print(f"Content: Original text preserved exactly")
+            print(f"Quality: AI-enhanced structure and formatting")
+            print(f"{'='*60}\n")
+
+    def _show_all_attempts_failed_alert(self, attempts: list):
+        """Display final alert when all AI attempts fail."""
+        if self.show_progress or self.debug:
+            print(f"\n{'!'*60}")
+            print(f"⚠️  ALL AI ATTEMPTS EXHAUSTED")
+            print(f"{'!'*60}")
+            print(f"Problem: All 4 AI attempts detected fabricated content")
+            print(f"Models Tried:")
+            for i, attempt in enumerate(attempts, 1):
+                model = attempt['model'].upper()
+                prompt = "standard" if not attempt['strict'] else "ultra-strict"
+                status = "Failed" if i < len(attempts) else "Failed"
+                print(f"  {i}. {model} ({prompt} prompt) - {status}")
+            print(f"Action: Falling back to rule-based conversion")
+            print(f"Safety: Original content will be preserved exactly")
+            print(f"{'!'*60}\n")
+
+    def _attempt_ai_conversion_with_retries(self, text_content: str, toc_chapters: list = None) -> Optional[str]:
+        """
+        Attempt AI conversion with up to 4 retries using different strategies.
+
+        Strategy:
+        1. Attempt 1: Sonnet + Standard prompt
+        2. Attempt 2: Sonnet + ULTRA-STRICT prompt
+        3. Attempt 3: Opus + ULTRA-STRICT prompt
+        4. Attempt 4: Haiku + ULTRA-STRICT prompt
+
+        Returns:
+            Markdown content if successful, None if all attempts fail
+        """
+        attempts = [
+            {'model': 'sonnet', 'strict': False, 'attempt': 1},
+            {'model': 'sonnet', 'strict': True, 'attempt': 2},
+            {'model': 'opus', 'strict': True, 'attempt': 3},
+            {'model': 'haiku', 'strict': True, 'attempt': 4}
+        ]
+
+        for attempt_config in attempts:
+            # Show attempt alert
+            self._show_attempt_alert(attempt_config)
+
+            # Create prompt (standard or ultra-strict)
+            prompt = self._create_analysis_prompt(
+                text_content,
+                toc_chapters,
+                ultra_strict=attempt_config['strict']
+            )
+
+            # Call Claude with specified model
+            success, result = self._call_claude(prompt, model=attempt_config['model'])
+
+            if success:
+                # Validate result
+                if self.show_progress or self.debug:
+                    print(f"🔍 Validating AI output for hallucinations...")
+
+                validation_passed = self._validate_no_hallucination(text_content, result)
+
+                if validation_passed:
+                    # SUCCESS!
+                    self._show_success_alert(attempt_config)
+                    return result
+                else:
+                    # Validation failed - extract details for alert
+                    validation_details = self._get_validation_failure_details(text_content, result)
+                    self._show_failure_alert(attempt_config, validation_details)
+            else:
+                # Claude call failed
+                if self.show_progress or self.debug:
+                    print(f"\n⚠️  Claude API call failed: {result}")
+                    if attempt_config['attempt'] < 4:
+                        print(f"   Proceeding to next attempt...")
+
+        # All attempts exhausted
+        self._show_all_attempts_failed_alert(attempts)
+        return None
+
+    def _get_validation_failure_details(self, original_text: str, markdown_output: str) -> dict:
+        """Extract details about why validation failed."""
+        import re
+
+        # Count dialogue lines
+        dialogue_pattern = r'^\*\*[A-Z][a-zA-Z\s]+\*\*:\s*.+$'
+        dialogue_lines = len(re.findall(dialogue_pattern, markdown_output, re.MULTILINE))
+        dialogue_count_in_original = len(re.findall(dialogue_pattern, original_text, re.MULTILINE))
+
+        # Calculate length ratio
+        def strip_markdown(text):
+            text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
+            text = re.sub(r'^>\s*', '', text, flags=re.MULTILINE)
+            text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+            text = re.sub(r'\*([^*]+)\*', r'\1', text)
+            text = re.sub(r'_([^_]+)_', r'\1', text)
+            text = re.sub(r'^\s*[-*•]\s+', '', text, flags=re.MULTILINE)
+            return text.strip()
+
+        original_len = len(strip_markdown(original_text))
+        output_len = len(strip_markdown(markdown_output))
+        length_ratio = output_len / original_len if original_len > 0 else 1.0
+
+        details = {}
+        if dialogue_lines > 5 and dialogue_lines > dialogue_count_in_original * 1.5:
+            details['dialogue_lines'] = dialogue_lines
+            details['original_lines'] = dialogue_count_in_original
+        elif length_ratio > 1.2:
+            details['length_ratio'] = length_ratio
+
+        return details
+
     def _validate_no_hallucination(self, original_text: str, markdown_output: str) -> bool:
         """
         Validate that AI didn't hallucinate or add content.
@@ -845,35 +1078,9 @@ Text to convert:
         toc_chapters = self._extract_toc_chapters(text_content)
 
         if len(text_content) <= chunk_size:
-            # Small enough to process in one go
-            prompt = self._create_analysis_prompt(text_content, toc_chapters)
-            success, result = self._call_claude(prompt)
-
-            # Try Haiku if initial model times out
-            if not success and "timed out" in result and self.enable_haiku_fallback and self.model != 'haiku':
-                if self.show_progress:
-                    print(f"🔄 Trying faster Haiku model...")
-                success, result = self._call_claude(prompt, 'haiku')
-                if success:
-                    self.model = 'haiku'
-
-            # Validate result if successful
-            if success:
-                if self.show_progress:
-                    print(f"🔍 Validating AI output for hallucinations...")
-                validation_passed = self._validate_no_hallucination(text_content, result)
-                if not validation_passed:
-                    if self.show_progress or self.debug:
-                        print(f"\n{'!'*60}")
-                        print(f"⚠️  ALERT: AI VALIDATION FAILED")
-                        print(f"{'!'*60}")
-                        print(f"Issue: AI may have added or fabricated content")
-                        print(f"Action: Falling back to rule-based text conversion")
-                        print(f"Result: Original content will be preserved exactly")
-                        print(f"{'!'*60}\n")
-                    return None  # Fall back to simple conversion
-
-            return result if success else None
+            # Small enough to process in one go - use retry strategy
+            result = self._attempt_ai_conversion_with_retries(text_content, toc_chapters)
+            return result  # Returns None if all attempts fail (triggers fallback)
         
         # Split into chunks at paragraph boundaries
         paragraphs = text_content.split('\n\n')
