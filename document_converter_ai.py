@@ -894,6 +894,99 @@ Text to convert:
 
         return details
 
+    def _ai_validate_content_preservation(self, original_text: str, markdown_output: str) -> tuple:
+        """
+        Use Claude AI to validate that content is preserved between original and output.
+        This provides semantic understanding that regex patterns cannot achieve.
+
+        Args:
+            original_text: The original input text
+            markdown_output: The AI-generated markdown output
+
+        Returns:
+            tuple: (is_valid: bool|None, explanation: str)
+                  is_valid is None if AI validation is inconclusive
+        """
+        # Strip markdown from output for fair comparison
+        def strip_markdown(text):
+            import re
+            # Remove markdown formatting but keep content
+            text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # Bold
+            text = re.sub(r'\*([^*]+)\*', r'\1', text)  # Italic
+            text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)  # Headers
+            text = re.sub(r'^\>\s+', '', text, flags=re.MULTILINE)  # Blockquotes
+            return text
+
+        stripped_output = strip_markdown(markdown_output)
+
+        validation_prompt = f"""You are a content preservation validator. Your task is to determine if two texts contain identical content, ignoring only formatting differences.
+
+ORIGINAL TEXT:
+{original_text[:5000]}
+
+FORMATTED OUTPUT (markdown stripped):
+{stripped_output[:5000]}
+
+Instructions:
+1. Compare the CONTENT (words, sentences, ideas) between both texts
+2. IGNORE these differences:
+   - Formatting (bold, italic, headers)
+   - Whitespace and line breaks
+   - Markdown syntax
+3. DETECT these issues:
+   - Added content (new text not in original)
+   - Removed content (original text missing)
+   - Changed content (different wording/meaning)
+
+Respond in EXACTLY this format:
+VERDICT: [IDENTICAL or DIFFERENT]
+REASON: [One sentence explanation]
+DETAILS: [Specific examples if DIFFERENT, or "Content matches exactly" if IDENTICAL]
+
+Be precise and factual."""
+
+        try:
+            # Use HAIKU model for fast validation
+            ai_model = self.config.config.get('ai_validation', {}).get('ai_validator_model', 'haiku')
+
+            if self.debug:
+                print(f"🤖 Using AI ({ai_model.upper()}) for content validation...")
+
+            result = self._call_claude(validation_prompt, model=ai_model, attempt=1)
+
+            if not result:
+                return (None, "AI validation: No response from Claude")
+
+            # Parse the response
+            if "VERDICT: IDENTICAL" in result or "VERDICT:IDENTICAL" in result:
+                reason_match = re.search(r'REASON:\s*(.+)', result)
+                reason = reason_match.group(1).strip() if reason_match else "Content preserved"
+                if self.debug:
+                    print(f"✓ AI validation PASSED: {reason}")
+                return (True, f"AI validation: {reason}")
+
+            elif "VERDICT: DIFFERENT" in result or "VERDICT:DIFFERENT" in result:
+                reason_match = re.search(r'REASON:\s*(.+)', result)
+                details_match = re.search(r'DETAILS:\s*(.+)', result, re.DOTALL)
+                reason = reason_match.group(1).strip() if reason_match else "Content differs"
+                details = details_match.group(1).strip() if details_match else "No details provided"
+                if self.debug:
+                    print(f"✗ AI validation FAILED: {reason}")
+                    print(f"  Details: {details[:200]}")
+                return (False, f"AI validation failed: {reason}\nDetails: {details[:500]}")
+
+            else:
+                # Couldn't parse response - inconclusive
+                if self.debug:
+                    print(f"⚠️  AI validation inconclusive - couldn't parse response")
+                return (None, f"AI validation inconclusive: {result[:200]}")
+
+        except Exception as e:
+            # AI validation error - return inconclusive
+            if self.debug:
+                print(f"⚠️  AI validation error: {str(e)}")
+            return (None, f"AI validation error: {str(e)}")
+
     def _validate_no_hallucination(self, original_text: str, markdown_output: str) -> bool:
         """
         Validate that AI didn't hallucinate or add content.
@@ -967,8 +1060,37 @@ Text to convert:
                 if self.debug or self.show_progress:
                     print(f"⚠️  WARNING: Detected {len(dialogue_lines)} dialogue lines in output")
                     print(f"   Original had {dialogue_count_in_original} dialogue lines")
-                    print(f"   AI may have fabricated dialogue - please review output carefully")
-                return False
+                    print(f"   This may be a false positive from formatting differences")
+
+                # Use AI validation if enabled for uncertain cases
+                use_ai_validator = self.config.config.get('ai_validation', {}).get('use_ai_validator', True)
+
+                if use_ai_validator:
+                    if self.debug or self.show_progress:
+                        print(f"🔍 Using AI validator to verify content preservation...")
+
+                    ai_valid, ai_explanation = self._ai_validate_content_preservation(original_text, markdown_output)
+
+                    if ai_valid is True:
+                        # AI confirmed content is identical
+                        if self.debug or self.show_progress:
+                            print(f"✓ AI validation resolved uncertainty: Content preserved")
+                        # Continue with other checks
+                    elif ai_valid is False:
+                        # AI confirmed content was changed
+                        if self.debug or self.show_progress:
+                            print(f"✗ AI validation confirmed issue: {ai_explanation}")
+                        return False
+                    else:
+                        # AI validation inconclusive - be conservative
+                        if self.debug or self.show_progress:
+                            print(f"⚠️  AI validation inconclusive - failing conservatively")
+                        return False
+                else:
+                    # AI validation disabled - fail based on regex check
+                    if self.debug or self.show_progress:
+                        print(f"   AI may have fabricated dialogue - please review output carefully")
+                    return False
 
         # Check 3: Look for common speaker names that might be hallucinated
         if check_suspicious_speakers:

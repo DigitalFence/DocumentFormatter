@@ -164,6 +164,9 @@
   "ai_validation": {
     "enabled": true,
     "comment": "Enable validation to detect AI hallucinations and fabricated content",
+    "use_ai_validator": true,
+    "ai_validator_model": "haiku",
+    "comment_ai": "Use AI (Claude) for semantic validation when regex is uncertain. Fast HAIKU model recommended.",
     "check_dialogue": true,
     "check_length_ratio": true,
     "check_suspicious_speakers": true,
