@@ -952,9 +952,9 @@ Be precise and factual."""
             if self.debug:
                 print(f"🤖 Using AI ({ai_model.upper()}) for content validation...")
 
-            result = self._call_claude(validation_prompt, model=ai_model, attempt=1)
+            success, result = self._call_claude(validation_prompt, model=ai_model)
 
-            if not result:
+            if not success or not result:
                 return (None, "AI validation: No response from Claude")
 
             # Parse the response
@@ -1332,10 +1332,42 @@ Be precise and factual."""
 
             chunk_elapsed = time.time() - chunk_start_time
             if result:
-                # AI conversion succeeded with validation
-                markdown_chunks.append(result)
-                if self.show_progress:
-                    print(f"✓ Chunk {i+1}/{len(chunks)} completed in {chunk_elapsed:.1f}s ({chunk_elapsed/60:.1f}min)")
+                # AI conversion succeeded - now validate with AI if enabled
+                validate_chunks = self.config.config.get('ai_validation', {}).get('validate_chunks_individually', True)
+
+                if validate_chunks:
+                    if self.show_progress:
+                        print(f"🔍 Validating chunk {i+1}/{len(chunks)} with AI...")
+
+                    ai_valid, ai_explanation = self._ai_validate_content_preservation(chunk, result)
+
+                    if ai_valid is True:
+                        # Chunk validated successfully
+                        if self.show_progress:
+                            print(f"✓ Chunk {i+1}/{len(chunks)} validation passed")
+                        markdown_chunks.append(result)
+                        if self.show_progress:
+                            print(f"✓ Chunk {i+1}/{len(chunks)} completed in {chunk_elapsed:.1f}s ({chunk_elapsed/60:.1f}min)")
+                    else:
+                        # Chunk validation failed - use rule-based as fallback
+                        if self.show_progress or self.debug:
+                            print(f"\n{'!'*60}")
+                            print(f"⚠️  CHUNK {i+1}/{len(chunks)}: AI VALIDATION FAILED")
+                            print(f"{'!'*60}")
+                            print(f"Issue: {ai_explanation}")
+                            print(f"Action: Using rule-based conversion for this chunk")
+                            print(f"{'!'*60}\n")
+
+                        # Fall back to rule-based conversion for this chunk
+                        is_first_chunk = (i == 0)
+                        markdown_chunks.append(self._simple_text_to_markdown(chunk, is_first_chunk=is_first_chunk))
+                        if self.show_progress:
+                            print(f"✓ Chunk {i+1}/{len(chunks)} completed (rule-based fallback) in {chunk_elapsed:.1f}s")
+                else:
+                    # Per-chunk validation disabled - use result as-is
+                    markdown_chunks.append(result)
+                    if self.show_progress:
+                        print(f"✓ Chunk {i+1}/{len(chunks)} completed in {chunk_elapsed:.1f}s ({chunk_elapsed/60:.1f}min)")
             else:
                 # All AI attempts failed for this chunk - use simple conversion as last resort
                 if self.show_progress:

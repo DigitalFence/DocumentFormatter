@@ -164,13 +164,18 @@
   "ai_validation": {
     "enabled": true,
     "comment": "Enable validation to detect AI hallucinations and fabricated content",
+    "validate_chunks_individually": true,
+    "comment_chunks": "Validate each chunk with AI immediately after transformation (before assembly). Catches fabrications at source.",
     "use_ai_validator": true,
     "ai_validator_model": "haiku",
     "comment_ai": "Use AI (Claude) for semantic validation when regex is uncertain. Fast HAIKU model recommended.",
     "check_dialogue": true,
     "check_length_ratio": true,
     "check_suspicious_speakers": true,
-    "max_length_ratio": 1.2,
+    "check_character_names": true,
+    "comment_characters": "Validate that no new character names appear in output",
+    "max_length_ratio": 1.15,
+    "comment_length": "Tightened from 1.2 to 1.15 (115%) to catch large fabrications",
     "dialogue_tolerance": 1.5
   }
 }
