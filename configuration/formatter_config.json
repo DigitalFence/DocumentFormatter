@@ -164,8 +164,8 @@
   "ai_validation": {
     "enabled": true,
     "comment": "Enable validation to detect AI hallucinations and fabricated content",
-    "validate_chunks_individually": true,
-    "comment_chunks": "Validate each chunk with AI immediately after transformation (before assembly). Catches fabrications at source.",
+    "validate_chunks_individually": false,
+    "comment_chunks": "Validate each chunk with AI immediately after transformation (before assembly). DISABLED by default due to validator timeouts. Enable only when specifically needed to catch fabrications.",
     "use_ai_validator": true,
     "ai_validator_model": "haiku",
     "comment_ai": "Use AI (Claude) for semantic validation when regex is uncertain. Fast HAIKU model recommended.",
