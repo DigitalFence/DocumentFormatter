@@ -120,26 +120,58 @@ For best results, ensure your input files are clean and free of markdown-like sp
 
 ## Configuration
 
-### Reference Document Setup
+### External Reference Folder (Simplified System)
 
-The reference document (`referenceformat.docx`) should contain:
-- Desired fonts and sizes
-- Heading styles (Heading 1, 2, 3, etc.)
-- Paragraph spacing and indentation
-- Page margins and layout
-- List styles
+The Word Formatter uses a simplified configuration system with an external reference folder:
 
-The formatter will extract and apply these styles to your documents.
+**Primary Location:** `~/WordFormatReference/`
 
-### Supported Locations for Reference File
+```
+~/WordFormatReference/
+├── ReferenceFormat.dotx              ← Template file (primary formatting source)
+├── formatter_config_template.json    ← Config template (copy when needed)
+├── Symbols.docx                      ← Chapter separator symbols
+└── README.md                         ← Documentation
+```
 
-1. Project directory: `/Users/KDP/scripts/wordformatterbyclaude/referenceformat.docx`
-2. Documents folder: `~/Documents/referenceformat.docx`
-3. Desktop: `~/Desktop/referenceformat.docx`
+### Default Behavior (Recommended)
 
-### Formatter Configuration (New!)
+By default, the formatter uses **only the .dotx template** for all styling:
+- No configuration file is needed
+- All formatting comes from the template
+- Simple, clean, maintainable
 
-The formatter now supports an external JSON configuration file for customizing formatting behavior. By default, the formatter uses styles from your reference document (template), but you can override specific styles using the configuration file.
+Just run:
+```bash
+./format_document.sh document.txt
+```
+
+### Custom Configuration (Optional)
+
+If you need to override specific formatting rules, enable the configuration:
+
+```bash
+cd ~/WordFormatReference
+cp formatter_config_template.json formatter_config.json
+# Edit formatter_config.json with your custom settings
+```
+
+The formatter will automatically detect and use `formatter_config.json` when present.
+
+To disable custom config:
+```bash
+rm ~/WordFormatReference/formatter_config.json
+```
+
+### Configuration Priority
+
+1. `FORMATTER_CONFIG_PATH` environment variable (if set)
+2. `~/WordFormatReference/formatter_config.json` (if exists)
+3. Built-in defaults + .dotx template styles (no config needed)
+
+### Formatter Configuration Options
+
+The configuration file allows you to override specific formatting behaviors. By default, the formatter uses styles from your reference document (template), but you can override specific styles using the configuration file.
 
 #### Configuration File Format
 

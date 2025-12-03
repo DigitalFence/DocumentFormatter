@@ -14,8 +14,8 @@ class FormatterConfig:
     """Manages formatter configuration with defaults and overrides."""
     
     DEFAULT_CONFIG = {
-        "external_reference_folder": None,
-        "reference_template": "referenceformat.docx",
+        "external_reference_folder": os.path.expanduser("~/WordFormatReference"),
+        "reference_template": "ReferenceFormat.dotx",
         "heading_overrides": {},
         "heading_detection": {
             "section_keywords": ["section", "part"],
@@ -44,47 +44,68 @@ class FormatterConfig:
     
     def __init__(self, config_path: Optional[str] = None):
         """Initialize configuration loader.
-        
+
+        Priority order for config files:
+        1. Explicit config_path parameter
+        2. FORMATTER_CONFIG_PATH environment variable
+        3. External reference folder (/Users/KDP/WordFormatReference/formatter_config.json)
+        4. If no config found, uses DEFAULT_CONFIG (template styles from .dotx file)
+
         Args:
-            config_path: Path to configuration file. If None, looks for formatter_config.json
-                        in the script directory.
+            config_path: Path to configuration file. If None, uses search order above.
         """
         self.config = self.DEFAULT_CONFIG.copy()
-        
-        # Find config file
+        config_file = None
+
+        # Priority 1: Explicit path provided
         if config_path:
             config_file = Path(config_path)
-        else:
-            # Look for config in configuration directory first
-            script_dir = Path(__file__).parent
-            config_file = script_dir / "configuration" / "formatter_config.json"
+            if self.debug:
+                print(f"✓ Using explicitly provided config path: {config_file}")
 
-            # Try old locations for backward compatibility
-            if not config_file.exists():
-                config_file = script_dir / "References" / "formatter_config.json"
-
-            if not config_file.exists():
-                config_file = script_dir / "formatter_config.json"
-            
-            # Also check if specified via environment variable
+        # Priority 2: Environment variable
+        elif os.environ.get('FORMATTER_CONFIG_PATH'):
             env_config = os.environ.get('FORMATTER_CONFIG_PATH')
-            if env_config and Path(env_config).exists():
+            if Path(env_config).exists():
                 config_file = Path(env_config)
-        
-        # Load config if it exists
-        if config_file.exists():
+                if self.debug:
+                    print(f"✓ Using config from environment variable: {config_file}")
+
+        # Priority 3: External reference folder (from DEFAULT_CONFIG)
+        else:
+            external_folder = self.DEFAULT_CONFIG.get("external_reference_folder")
+            if external_folder:
+                external_config_path = Path(external_folder) / "formatter_config.json"
+                if external_config_path.exists():
+                    config_file = external_config_path
+                    if self.debug:
+                        print(f"✓ Using config from external reference folder: {config_file}")
+
+        # Load config if found
+        if config_file and config_file.exists():
             try:
                 with open(config_file, 'r') as f:
                     user_config = json.load(f)
                     self._merge_config(user_config)
                     self.config_loaded = True
                     self.config_path = str(config_file)
+                    if self.debug:
+                        print(f"✓ Loaded config from: {config_file}")
             except Exception as e:
                 print(f"Warning: Could not load config from {config_file}: {e}")
                 self.config_loaded = False
+                self.config_path = None
         else:
+            # No config file found, use defaults (will use .dotx template styles)
             self.config_loaded = False
             self.config_path = None
+            if self.debug:
+                print("ℹ No config file found, using defaults + .dotx template styles")
+
+    @property
+    def debug(self):
+        """Get debug flag from environment."""
+        return os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1'
     
     def _merge_config(self, user_config: Dict[str, Any]):
         """Merge user configuration with defaults."""
