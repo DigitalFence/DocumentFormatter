@@ -519,23 +519,64 @@ Priority test cases for automation:
 
 ## Configuration
 
-### User Settings (config.json)
+### External Reference Folder (Simplified System)
+
+The Word Formatter uses a simplified configuration system with an external reference folder:
+
+**Primary Location:** `~/WordFormatReference/`
+
+```
+~/WordFormatReference/
+├── ReferenceFormat.dotx              ← Template file (primary formatting source)
+├── formatter_config_template.json    ← Config template (copy to enable)
+├── Symbols.docx                      ← Chapter separator symbols
+└── README.md                         ← Documentation
+```
+
+**Default Behavior (No Config):**
+- The formatter uses **only the .dotx template** for all styling
+- No configuration file is needed
+- Simple, clean, maintainable
+
+**Custom Configuration (When Needed):**
+```bash
+cd ~/WordFormatReference
+cp formatter_config_template.json formatter_config.json
+# Edit formatter_config.json with your custom settings
+```
+
+### Configuration Priority
+
+1. `FORMATTER_CONFIG_PATH` environment variable (if set)
+2. `~/WordFormatReference/formatter_config.json` (if exists)
+3. Built-in defaults + .dotx template styles (no config needed)
+
+### Config Template Structure
 
 ```json
 {
-  "ai_enhancement": {
-    "enabled": true,
-    "model": "claude-3-opus",
-    "max_file_size_kb": 100,
-    "timeout_seconds": 30,
-    "fallback_on_error": true
+  "external_reference_folder": "~/WordFormatReference",
+  "reference_template": "ReferenceFormat.dotx",
+  "style_overrides": {
+    "Normal": { "font_name": "Aptos Light", "font_size": 12.0 },
+    "Title": { "font_name": "Aptos Light", "font_size": 48.0 }
   },
-  "prompts": {
-    "custom_instructions": "",
-    "document_type": "auto"
-  }
+  "heading_overrides": {
+    "heading_1": { "font_name": "Aptos Light", "font_size": 16.0, "alignment": "center" }
+  },
+  "page_breaks": { "before_chapters": true, "after_title": true },
+  "blockquote_formatting": { "center_align": true, "italic": true }
 }
 ```
+
+### AI Enhancement Environment Variables
+
+- `CLAUDE_MODEL` - Choose AI model: `haiku`, `sonnet`, or `opus` (default: `sonnet`)
+- `SAVE_MARKDOWN` - Save intermediate markdown file: `0` or `1` (default: `1`)
+- `SHOW_PROGRESS` - Show conversion progress: `0` or `1` (default: `1`)
+- `CLAUDE_TIMEOUT` - Timeout in seconds (default: `600`)
+- `WORD_FORMATTER_DEBUG` - Verbose debug output: `0` or `1` (default: `0`)
+- `FORMATTER_CONFIG_PATH` - Override config file path (optional)
 
 ## Troubleshooting
 

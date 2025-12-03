@@ -12,44 +12,32 @@ echo "Script started with arguments: $@"
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo "Script directory: $SCRIPT_DIR"
 
-# Set the configuration file path
-CONFIG_FILE="$SCRIPT_DIR/configuration/formatter_config.json"
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "WARNING: Configuration file not found at $CONFIG_FILE"
-    CONFIG_FILE=""
+# Determine configuration file path (matches Python config_loader.py priority)
+# Priority order:
+# 1. FORMATTER_CONFIG_PATH environment variable
+# 2. External reference folder (~/WordFormatReference/formatter_config.json)
+# 3. If no config found, uses .dotx template styles (no local fallbacks)
+
+CONFIG_FILE=""
+EXTERNAL_REF_FOLDER="$HOME/WordFormatReference"
+
+# Priority 1: Environment variable
+if [ -n "$FORMATTER_CONFIG_PATH" ] && [ -f "$FORMATTER_CONFIG_PATH" ]; then
+    CONFIG_FILE="$FORMATTER_CONFIG_PATH"
+    echo "Using config from environment variable: $CONFIG_FILE"
+
+# Priority 2: External reference folder
+elif [ -f "$EXTERNAL_REF_FOLDER/formatter_config.json" ]; then
+    CONFIG_FILE="$EXTERNAL_REF_FOLDER/formatter_config.json"
+    echo "Using config from external reference folder: $CONFIG_FILE"
+
 else
-    echo "Using configuration file: $CONFIG_FILE"
+    echo "No config file found - will use .dotx template styles"
 fi
 
-# Determine reference format document path from config
-REFERENCE_FORMAT=""
-if [ -n "$CONFIG_FILE" ] && [ -f "$CONFIG_FILE" ]; then
-    # Try to extract external_reference_folder and reference_template from config
-    external_folder=$(python3 -c "import json; config=json.load(open('$CONFIG_FILE')); print(config.get('external_reference_folder', ''))" 2>/dev/null)
-    template_name=$(python3 -c "import json; config=json.load(open('$CONFIG_FILE')); print(config.get('reference_template', ''))" 2>/dev/null)
-
-    if [ -n "$external_folder" ] && [ -n "$template_name" ]; then
-        # Try external reference folder first
-        candidate_path="$external_folder/$template_name"
-        if [ -f "$candidate_path" ]; then
-            REFERENCE_FORMAT="$candidate_path"
-            echo "Using external reference template: $REFERENCE_FORMAT"
-        fi
-    fi
-fi
-
-# Fall back to local References folder if not found in external location
-if [ -z "$REFERENCE_FORMAT" ]; then
-    # Try .dotx first, then .docx
-    if [ -f "$SCRIPT_DIR/References/ReferenceFormat.dotx" ]; then
-        REFERENCE_FORMAT="$SCRIPT_DIR/References/ReferenceFormat.dotx"
-    elif [ -f "$SCRIPT_DIR/References/referenceformat.docx" ]; then
-        REFERENCE_FORMAT="$SCRIPT_DIR/References/referenceformat.docx"
-    else
-        REFERENCE_FORMAT="$SCRIPT_DIR/References/referenceformat.docx"
-    fi
-    echo "Using local reference format: $REFERENCE_FORMAT"
-fi
+# Note: Python's config_loader.py will handle all template path resolution
+# If no config exists, the .dotx template's built-in styles will be used
+# This ensures shell and Python use the same logic
 
 # Check virtual environment
 if [ ! -d "$SCRIPT_DIR/venv" ]; then
@@ -163,10 +151,11 @@ for file in "$@"; do
             export WORD_FORMATTER_DEBUG=1
             
             # Add config file parameter if available
+            # Python will resolve template path via config_loader.py
             if [ -n "$CONFIG_FILE" ]; then
-                python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" --config "$CONFIG_FILE" "$file"
+                python "$SCRIPT_DIR/document_converter_ai.py" --config "$CONFIG_FILE" "$file"
             else
-                python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" "$file"
+                python "$SCRIPT_DIR/document_converter_ai.py" "$file"
             fi
             converter_exit_code=$?
             echo "AI converter exit code: $converter_exit_code"
@@ -195,10 +184,11 @@ for file in "$@"; do
 
             # Still use AI converter - it has fallback logic for when Claude is not available
             # This ensures RTF/TXT files get proper markdown structure detection
+            # Python will resolve template path via config_loader.py
             if [ -n "$CONFIG_FILE" ]; then
-                python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" --config "$CONFIG_FILE" "$file"
+                python "$SCRIPT_DIR/document_converter_ai.py" --config "$CONFIG_FILE" "$file"
             else
-                python "$SCRIPT_DIR/document_converter_ai.py" --reference "$REFERENCE_FORMAT" "$file"
+                python "$SCRIPT_DIR/document_converter_ai.py" "$file"
             fi
             converter_exit_code=$?
             echo "AI converter (fallback mode) exit code: $converter_exit_code"
@@ -218,10 +208,11 @@ for file in "$@"; do
         send_notification "Word Formatter" "Standard Conversion" "Processing $filename (non-text file)" "Glass"
         
         # Use document_converter.py with config support
+        # Python will resolve template path via config_loader.py
         if [ -n "$CONFIG_FILE" ]; then
-            python "$SCRIPT_DIR/document_converter.py" --input "$file" --reference "$REFERENCE_FORMAT" --config "$CONFIG_FILE"
+            python "$SCRIPT_DIR/document_converter.py" --input "$file" --config "$CONFIG_FILE"
         else
-            python "$SCRIPT_DIR/document_converter.py" --input "$file" --reference "$REFERENCE_FORMAT"
+            python "$SCRIPT_DIR/document_converter.py" --input "$file"
         fi
         converter_exit_code=$?
         echo "Simple converter exit code: $converter_exit_code"

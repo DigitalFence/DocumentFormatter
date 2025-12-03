@@ -2185,19 +2185,32 @@ def main():
     )
     parser.add_argument('--input', '-i', dest='input_file',
                         help='Path to input file (txt, md, or docx)')
-    parser.add_argument('--reference', '-r', required=True, dest='reference_file',
-                        help='Path to reference Word document for styling')
+    parser.add_argument('--reference', '-r', dest='reference_file',
+                        help='Path to reference Word document for styling (optional, uses config if not specified)')
     parser.add_argument('--output', '-o', dest='output',
                         help='Output file path (default: input_file_formatted.docx)')
     parser.add_argument('--config', '-c', dest='config_file',
                         help='Path to configuration file (default: formatter_config.json)')
     parser.add_argument('--export-styles', dest='export_styles',
                         help='Export all styles from reference document to JSON file')
-    
+
     args = parser.parse_args()
-    
-    # Validate inputs
-    reference_path = Path(args.reference_file)
+
+    # Load config first to get reference template path if not provided
+    from config_loader import FormatterConfig
+    config = FormatterConfig(args.config_file)
+
+    # Get reference path from args or config
+    if args.reference_file:
+        reference_path = Path(args.reference_file)
+    else:
+        # Get reference path from config
+        template_path = config.get_reference_template_path()
+        if template_path:
+            reference_path = template_path
+        else:
+            print("Error: No reference template found. Please specify --reference or configure external_reference_folder.")
+            sys.exit(1)
     
     # If exporting styles, we don't need an input file
     if args.export_styles:
