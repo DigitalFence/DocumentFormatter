@@ -31,6 +31,11 @@ class FormatterConfig:
             "single_line_spacing": True,
             "center_align": True
         },
+        "script_styling": {
+            "enabled": True,
+            "devanagari_style": "Intense Quote",
+            "transliteration_style": "Quote"
+        },
         "chapter_separator": {
             "enabled": False,
             "symbol": "❦",
@@ -227,7 +232,21 @@ class FormatterConfig:
     def get_blockquote_settings(self) -> Dict[str, Any]:
         """Get blockquote formatting settings."""
         return self.config.get("blockquote_formatting", {})
-    
+
+    def get_script_styling_settings(self) -> Dict[str, Any]:
+        """Get script-based styling settings.
+
+        Returns settings for styling Devanagari and transliteration text:
+        - enabled: Whether to apply script-based styling
+        - devanagari_style: Word style for Devanagari text (default: 'Intense Quote')
+        - transliteration_style: Word style for transliteration text (default: 'Quote')
+        """
+        return self.config.get("script_styling", {
+            "enabled": True,
+            "devanagari_style": "Intense Quote",
+            "transliteration_style": "Quote"
+        })
+
     def resolve_reference_file(self, filename: str) -> Optional[Path]:
         """Resolve path to a reference file (template or symbols).
 
