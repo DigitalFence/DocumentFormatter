@@ -1827,8 +1827,11 @@ class DocumentConverter:
         """Apply Word character style based on script type.
 
         Uses configuration settings for style names:
-        - Devanagari script: config 'devanagari_style' (default: 'Intense Quote')
-        - Transliteration (diacritics): config 'transliteration_style' (default: 'Quote')
+        - Devanagari script: config 'devanagari_style' (default: 'Intense Quote Char')
+        - Transliteration (diacritics): config 'transliteration_style' (default: 'Quote Char')
+
+        Note: Word has separate paragraph styles (Quote, Intense Quote) and character styles
+        (Quote Char, Intense Quote Char). For runs, we must use character styles.
         """
         if not text or not text.strip():
             return
@@ -1842,8 +1845,15 @@ class DocumentConverter:
         if not script_settings.get('enabled', True):
             return
 
-        devanagari_style = script_settings.get('devanagari_style', 'Intense Quote')
-        transliteration_style = script_settings.get('transliteration_style', 'Quote')
+        # Get configured style names - convert paragraph style names to character style names if needed
+        devanagari_style = script_settings.get('devanagari_style', 'Intense Quote Char')
+        transliteration_style = script_settings.get('transliteration_style', 'Quote Char')
+
+        # Ensure we're using character style variants (append ' Char' if needed)
+        if devanagari_style == 'Intense Quote':
+            devanagari_style = 'Intense Quote Char'
+        if transliteration_style == 'Quote':
+            transliteration_style = 'Quote Char'
 
         script_type = detect_script_type(text)
 
@@ -1852,21 +1862,21 @@ class DocumentConverter:
                 run.style = devanagari_style
                 if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                     print(f"DEBUG: Applied '{devanagari_style}' style to Devanagari text: '{text[:30]}...'")
-            except KeyError:
-                # Style doesn't exist in document, just use italic
+            except (KeyError, ValueError) as e:
+                # Style doesn't exist in document or wrong type, just use italic
                 run.italic = True
                 if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                    print(f"DEBUG: '{devanagari_style}' style not found, using italic for Devanagari text")
+                    print(f"DEBUG: '{devanagari_style}' style error ({e}), using italic for Devanagari text")
         elif script_type == 'transliteration':
             try:
                 run.style = transliteration_style
                 if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                     print(f"DEBUG: Applied '{transliteration_style}' style to transliteration text: '{text[:30]}...'")
-            except KeyError:
-                # Style doesn't exist in document, just use italic
+            except (KeyError, ValueError) as e:
+                # Style doesn't exist in document or wrong type, just use italic
                 run.italic = True
                 if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                    print(f"DEBUG: '{transliteration_style}' style not found, using italic for transliteration text")
+                    print(f"DEBUG: '{transliteration_style}' style error ({e}), using italic for transliteration text")
     
     def _process_table(self, table_element):
         """Process HTML table to Word table."""
