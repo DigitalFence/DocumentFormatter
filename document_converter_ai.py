@@ -129,7 +129,7 @@ This is a RETRY attempt because previous AI output FAILED validation.
 
 """
 
-        return f"""Convert the following plain text to well-structured markdown format.
+        return rf"""Convert the following plain text to well-structured markdown format.
 {ultra_strict_section}
 🚨 ABSOLUTELY CRITICAL - ZERO TOLERANCE RULES - READ FIRST:
 
