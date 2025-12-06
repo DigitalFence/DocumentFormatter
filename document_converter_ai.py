@@ -335,13 +335,14 @@ Text to convert:
         """Call Claude CLI and return success status and output."""
         if model is None:
             model = self.model
-            
+
         try:
-            # Show progress if enabled
+            # Show progress if enabled - always flush for real-time output
             if self.show_progress:
-                print(f"🤖 Using Claude {model.upper()} model for AI analysis...")
+                print(f"🤖 Using Claude {model.upper()} model for AI analysis...", flush=True)
+                print(f"   ⏳ Waiting for Claude response (timeout: {self.timeout}s)...", flush=True)
             elif self.debug:
-                print(f"Calling Claude ({model}) for text analysis...")
+                print(f"Calling Claude ({model}) for text analysis...", flush=True)
             
             # Use explicit Claude path if provided, otherwise use 'claude' from PATH
             claude_cmd = os.environ.get('CLAUDE_CLI_PATH', 'claude')
@@ -354,6 +355,9 @@ Text to convert:
                 timeout=self.timeout
             )
             
+            if self.show_progress:
+                print(f"   ✓ Claude response received ({len(result.stdout)} chars)", flush=True)
+
             if result.returncode == 0 and result.stdout.strip():
                 output = result.stdout.strip()
 
@@ -787,6 +791,9 @@ Text to convert:
             # Show attempt alert
             self._show_attempt_alert(attempt_config)
 
+            if self.show_progress:
+                print(f"   📝 Creating prompt (strict={attempt_config['strict']})...", flush=True)
+
             # Create prompt (standard or ultra-strict)
             prompt = self._create_analysis_prompt(
                 text_content,
@@ -794,13 +801,16 @@ Text to convert:
                 ultra_strict=attempt_config['strict']
             )
 
+            if self.show_progress:
+                print(f"   📤 Prompt size: {len(prompt):,} characters", flush=True)
+
             # Call Claude with specified model
             success, result = self._call_claude(prompt, model=attempt_config['model'])
 
             if success:
                 # Validate result
                 if self.show_progress or self.debug:
-                    print(f"🔍 Validating AI output for hallucinations...")
+                    print(f"   🔍 Validating AI output for hallucinations...", flush=True)
 
                 validation_passed = self._validate_no_hallucination(text_content, result)
 
@@ -1093,6 +1103,8 @@ Text to convert:
 
         if len(text_content) <= chunk_size:
             # Small enough to process in one go - use retry strategy
+            if self.show_progress:
+                print(f"   📄 Single-chunk processing (content fits in one request)", flush=True)
             result = self._attempt_ai_conversion_with_retries(text_content, toc_chapters)
             return result  # Returns None if all attempts fail (triggers fallback)
         
@@ -1101,10 +1113,37 @@ Text to convert:
         chunks = []
         current_chunk = []
         current_size = 0
-        
+
         for para in paragraphs:
             para_size = len(para)
-            if current_size + para_size > chunk_size and current_chunk:
+
+            # If a single paragraph is too large, split it further on single newlines
+            if para_size > chunk_size:
+                # First, save any accumulated chunk
+                if current_chunk:
+                    chunks.append('\n\n'.join(current_chunk))
+                    current_chunk = []
+                    current_size = 0
+
+                # Split large paragraph on single newlines
+                lines = para.split('\n')
+                for line in lines:
+                    line_size = len(line)
+                    if current_size + line_size > chunk_size and current_chunk:
+                        chunks.append('\n'.join(current_chunk))
+                        current_chunk = [line]
+                        current_size = line_size
+                    else:
+                        current_chunk.append(line)
+                        current_size += line_size
+
+                # Save remaining lines as a chunk
+                if current_chunk:
+                    chunks.append('\n'.join(current_chunk))
+                    current_chunk = []
+                    current_size = 0
+
+            elif current_size + para_size > chunk_size and current_chunk:
                 # Save current chunk and start new one
                 chunks.append('\n\n'.join(current_chunk))
                 current_chunk = [para]
@@ -1112,13 +1151,15 @@ Text to convert:
             else:
                 current_chunk.append(para)
                 current_size += para_size
-        
+
         # Don't forget the last chunk
         if current_chunk:
             chunks.append('\n\n'.join(current_chunk))
         
         if self.show_progress:
-            print(f"📦 Processing {len(chunks)} chunks...")
+            print(f"📦 Processing {len(chunks)} chunks...", flush=True)
+            for i, chunk in enumerate(chunks):
+                print(f"   Chunk {i+1}: {len(chunk):,} characters", flush=True)
         
         # Process each chunk with full retry strategy
         markdown_chunks = []
@@ -1234,8 +1275,8 @@ Text to convert:
         try:
             # Show progress
             if self.show_progress:
-                print(f"📄 Processing: {input_path.name}")
-            
+                print(f"📄 Processing: {input_path.name}", flush=True)
+
             # Read the input file based on format
             if input_path.suffix.lower() == '.rtf':
                 # Read RTF file and extract plain text
@@ -1264,15 +1305,16 @@ Text to convert:
             if input_path.suffix.lower() in ['.txt', '.rtf']:
                 # Try AI analysis for text files
                 if self.show_progress:
-                    print(f"🔍 Analyzing document structure...")
+                    print(f"🔍 Analyzing document structure...", flush=True)
+                    print(f"   📊 Content size: {len(text_content):,} characters", flush=True)
                 elif not self.debug:
-                    print(f"Analyzing document structure with AI...")
+                    print(f"Analyzing document structure with AI...", flush=True)
                 
                 # Check if chunking is needed
                 chunk_threshold = int(os.environ.get('CHUNK_THRESHOLD', '10000'))  # Changed to 10KB
                 if len(text_content) > chunk_threshold:
                     if self.show_progress:
-                        print(f"📊 Document size: {len(text_content):,} chars, using chunked processing...")
+                        print(f"   📦 Large document - using chunked processing...", flush=True)
                 
                 # Use chunking method which handles both small and large files
                 result = self._process_in_chunks(text_content, chunk_threshold)

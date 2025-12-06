@@ -170,7 +170,55 @@ Focus on:
 
 ## Implementation Details
 
-### Recent Improvements (2025-08-26)
+### Recent Improvements (2025-12-06)
+
+#### 1. Smart Chunking for Large Documents
+Large documents are now processed in manageable chunks to avoid Claude CLI timeouts and improve reliability.
+
+**Chunking Strategy:**
+- Default chunk size: ~10KB (`CHUNK_THRESHOLD` environment variable)
+- First attempts to split on paragraph boundaries (`\n\n`)
+- If a "paragraph" exceeds chunk size (common in RTF files with single newlines), splits further on single newlines (`\n`)
+- Each chunk is processed independently with full retry strategy
+- Results are reassembled maintaining document order
+
+**Why This Matters:**
+- RTF files often use single newlines instead of double newlines between paragraphs
+- A 160KB document that appears as "3 paragraphs" (with one 150KB block) would timeout
+- Smart chunking converts this to 18 manageable ~10KB chunks
+
+**Progress Logging:**
+```
+📦 Processing 18 chunks...
+   Chunk 1: 4,987 characters
+   Chunk 2: 9,950 characters
+   ...
+   Chunk 18: 4,772 characters
+```
+
+#### 2. Script-Based Styling for Non-English Text
+Automatic detection and styling of different scripts:
+
+- **Devanagari** (Sanskrit, Hindi - Unicode U+0900-U+097F): `Intense Quote Char` style
+- **Transliteration** (Latin with diacritics like ā, ī, ū, ṛ, ś): `Quote Char` style
+- **Plain text**: No special styling
+
+**Important:** Uses Word **character styles** (not paragraph styles) for run-level formatting.
+
+#### 3. Real-Time Progress Logging
+All progress messages now use `flush=True` for immediate output visibility in logs:
+```python
+print(f"🤖 Using Claude {model} model...", flush=True)
+print(f"   ⏳ Waiting for Claude response (timeout: {self.timeout}s)...", flush=True)
+print(f"   ✓ Claude response received ({len(result)} chars)", flush=True)
+```
+
+#### 4. Bug Fixes
+- **Character Style Error**: Fixed "assigned style is type PARAGRAPH (1), need type CHARACTER (2)" by using `Quote Char` instead of `Quote`
+- **SyntaxWarning**: Fixed Python 3.13+ invalid escape sequence `\.` by using raw f-string (`rf"""`)
+- **Chunk Size**: Fixed issue where RTF files with single newlines created massive 150KB "paragraphs"
+
+### Previous Improvements (2025-08-26)
 
 #### 1. Enhanced Configuration System
 - **Environment Variables**: Added comprehensive configuration via environment variables
@@ -575,6 +623,7 @@ cp formatter_config_template.json formatter_config.json
 - `SAVE_MARKDOWN` - Save intermediate markdown file: `0` or `1` (default: `1`)
 - `SHOW_PROGRESS` - Show conversion progress: `0` or `1` (default: `1`)
 - `CLAUDE_TIMEOUT` - Timeout in seconds (default: `600`)
+- `CHUNK_THRESHOLD` - Max chunk size in characters (default: `10000`)
 - `WORD_FORMATTER_DEBUG` - Verbose debug output: `0` or `1` (default: `0`)
 - `FORMATTER_CONFIG_PATH` - Override config file path (optional)
 
@@ -586,9 +635,22 @@ cp formatter_config_template.json formatter_config.json
    - Solution: Install Claude CLI or disable AI enhancement
 
 2. **Timeout errors**
-   - Solution: Increase timeout or reduce file size
+   - Solution: Increase timeout with `CLAUDE_TIMEOUT=900` or reduce chunk size with `CHUNK_THRESHOLD=5000`
 
-3. **Formatting inconsistencies**
+3. **Large chunks causing timeouts**
+   - Symptom: One chunk is 150KB while others are 10KB
+   - Cause: RTF files often use single newlines instead of double newlines
+   - Solution: Fixed in latest version - splits large paragraphs on single newlines
+
+4. **"assigned style is type PARAGRAPH" error**
+   - Cause: Trying to apply paragraph styles (Quote, Intense Quote) to runs
+   - Solution: Use character styles (Quote Char, Intense Quote Char)
+
+5. **SyntaxWarning in Python 3.13+**
+   - Cause: Invalid escape sequences like `\.` in strings
+   - Solution: Use raw strings (`r"..."` or `rf"..."` for f-strings)
+
+6. **Formatting inconsistencies**
    - Solution: Adjust prompt templates
 
 ### Debug Mode
