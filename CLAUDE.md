@@ -218,6 +218,50 @@ print(f"   ✓ Claude response received ({len(result)} chars)", flush=True)
 - **SyntaxWarning**: Fixed Python 3.13+ invalid escape sequence `\.` by using raw f-string (`rf"""`)
 - **Chunk Size**: Fixed issue where RTF files with single newlines created massive 150KB "paragraphs"
 
+#### 5. Setup and Configuration Improvements (2025-12-06 - Second Update)
+
+**Virtual Environment Setup:**
+- Fixed shell script to use explicit venv Python path instead of relying on PATH activation
+- Changed from `python` to `"$SCRIPT_DIR/venv/bin/python"` for reliability
+- Ensures correct Python interpreter and dependencies are always used
+
+**Reference Template Resolution:**
+- Fixed `document_converter_ai.py` to use config system for template resolution
+- Removed hardcoded search paths (References/, Documents/, Desktop/)
+- Now properly uses `~/WordFormatReference/ReferenceFormat.dotx` via config_loader
+- Template resolution order:
+  1. Explicit `--reference` argument
+  2. Config system (`FormatterConfig.get_reference_template_path()`)
+  3. External reference folder (`~/WordFormatReference/`)
+
+**Progress Visibility Enhancement:**
+- Added `export SHOW_PROGRESS=1` to `format_document.sh` (lines 152, 185)
+- Enables real-time progress output for all conversions
+- Shows chunk-by-chunk progress for large documents
+- Critical for understanding conversion status (avoids apparent "hangs")
+
+**Debug Instrumentation:**
+- Added detailed timing logs to track conversion bottlenecks
+- Shows prompt creation time (typically 0.00s)
+- Shows subprocess execution time (~20-50s per chunk for Claude API calls)
+- Helps diagnose performance issues and apparent hangs
+
+**Key Insight - Apparent "Hang" Issue Resolved:**
+- **Problem**: Conversions appeared to hang for 15+ minutes with no output
+- **Root Cause**: `SHOW_PROGRESS` not set, so no output during Claude API calls
+- **Reality**: Claude CLI takes ~50 seconds per chunk (normal API processing time)
+- **Solution**: Progress display now shows real-time status during processing
+- **Example**: 160KB document = 18 chunks × 50s = ~15 minutes (with visible progress)
+
+**Debug Logging Added:**
+```python
+print(f"[DEBUG] Text content size: {len(text_content):,} chars", flush=True)
+print(f"[DEBUG] Starting prompt creation...", flush=True)
+print(f"[DEBUG] Prompt creation completed in {creation_time:.2f}s", flush=True)
+print(f"[DEBUG] About to call Claude...", flush=True)
+print(f"[DEBUG] subprocess.run completed in {subprocess_time:.2f}s", flush=True)
+```
+
 ### Previous Improvements (2025-08-26)
 
 #### 1. Enhanced Configuration System

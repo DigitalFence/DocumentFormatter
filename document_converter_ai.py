@@ -341,12 +341,20 @@ Text to convert:
             if self.show_progress:
                 print(f"🤖 Using Claude {model.upper()} model for AI analysis...", flush=True)
                 print(f"   ⏳ Waiting for Claude response (timeout: {self.timeout}s)...", flush=True)
+                print(f"      [DEBUG] Prompt size being sent: {len(prompt):,} chars", flush=True)
             elif self.debug:
                 print(f"Calling Claude ({model}) for text analysis...", flush=True)
-            
+
             # Use explicit Claude path if provided, otherwise use 'claude' from PATH
             claude_cmd = os.environ.get('CLAUDE_CLI_PATH', 'claude')
-            
+
+            if self.show_progress:
+                print(f"      [DEBUG] Claude command: {claude_cmd}", flush=True)
+                print(f"      [DEBUG] Starting subprocess.run...", flush=True)
+
+            import time
+            subprocess_start = time.time()
+
             # Use Claude in print mode for non-interactive output
             result = subprocess.run(
                 [claude_cmd, '--model', model, '--print', prompt],
@@ -354,6 +362,11 @@ Text to convert:
                 text=True,
                 timeout=self.timeout
             )
+
+            subprocess_time = time.time() - subprocess_start
+
+            if self.show_progress:
+                print(f"      [DEBUG] subprocess.run completed in {subprocess_time:.2f}s", flush=True)
             
             if self.show_progress:
                 print(f"   ✓ Claude response received ({len(result.stdout)} chars)", flush=True)
@@ -793,16 +806,23 @@ Text to convert:
 
             if self.show_progress:
                 print(f"   📝 Creating prompt (strict={attempt_config['strict']})...", flush=True)
+                print(f"      [DEBUG] Text content size: {len(text_content):,} chars", flush=True)
+                print(f"      [DEBUG] Starting prompt creation...", flush=True)
 
             # Create prompt (standard or ultra-strict)
+            import time
+            start_time = time.time()
             prompt = self._create_analysis_prompt(
                 text_content,
                 toc_chapters,
                 ultra_strict=attempt_config['strict']
             )
+            creation_time = time.time() - start_time
 
             if self.show_progress:
+                print(f"      [DEBUG] Prompt creation completed in {creation_time:.2f}s", flush=True)
                 print(f"   📤 Prompt size: {len(prompt):,} characters", flush=True)
+                print(f"      [DEBUG] About to call Claude...", flush=True)
 
             # Call Claude with specified model
             success, result = self._call_claude(prompt, model=attempt_config['model'])
@@ -1440,37 +1460,18 @@ def main():
     input_file = args.input_file
     output_file = args.output_file
     
-    # Use reference format from argument or find default
+    # Use reference format from argument or let config system handle it
     if args.reference:
         reference_path = Path(args.reference)
         if not reference_path.exists():
             print(f"Error: Reference format file not found: {args.reference}")
             sys.exit(1)
+        ref_path_str = str(reference_path)
     else:
-        # Find default reference format file
-        script_dir = Path(__file__).parent
-        reference_path = script_dir / "References" / "referenceformat.docx"
-        
-        if not reference_path.exists():
-            # Try old location for backward compatibility
-            reference_path = script_dir / "referenceformat.docx"
-        
-        if not reference_path.exists():
-            reference_path = Path.home() / "Documents" / "referenceformat.docx"
-        
-        if not reference_path.exists():
-            reference_path = Path.home() / "Desktop" / "referenceformat.docx"
-        
-        if not reference_path.exists():
-            print("Error: Reference format file not found. Please place 'referenceformat.docx' in one of these locations:")
-            print(f"  - {script_dir / 'References'}")
-            print(f"  - {script_dir}")
-            print(f"  - {Path.home() / 'Documents'}")
-            print(f"  - {Path.home() / 'Desktop'}")
-            sys.exit(1)
-    
-    # Create converter and process (pass None if using config-based path)
-    ref_path_str = str(reference_path) if args.reference else None
+        # Let AIDocumentConverter use config system to find reference template
+        ref_path_str = None
+
+    # Create converter and process (config system will resolve template path if ref_path_str is None)
     converter = AIDocumentConverter(ref_path_str, config_path=args.config)
     success = converter.convert_with_ai(input_file, output_file)
     

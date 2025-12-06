@@ -54,7 +54,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Check Python availability
-python_version=$(python --version 2>&1)
+python_version=$("$SCRIPT_DIR/venv/bin/python" --version 2>&1)
 echo "Python version: $python_version"
 
 # Add common binary paths to PATH for Finder context
@@ -147,15 +147,16 @@ for file in "$@"; do
             
             # Export the claude path so Python subprocess can find it
             export CLAUDE_CLI_PATH="$claude_path"
-            # Enable debug logging
+            # Enable debug logging and progress display
             export WORD_FORMATTER_DEBUG=1
+            export SHOW_PROGRESS=1
             
             # Add config file parameter if available
             # Python will resolve template path via config_loader.py
             if [ -n "$CONFIG_FILE" ]; then
-                python "$SCRIPT_DIR/document_converter_ai.py" --config "$CONFIG_FILE" "$file"
+                "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/document_converter_ai.py" --config "$CONFIG_FILE" "$file"
             else
-                python "$SCRIPT_DIR/document_converter_ai.py" "$file"
+                "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/document_converter_ai.py" "$file"
             fi
             converter_exit_code=$?
             echo "AI converter exit code: $converter_exit_code"
@@ -179,16 +180,17 @@ for file in "$@"; do
             filename=$(basename "$file")
             send_notification "Word Formatter" "Fallback Mode" "Claude AI not available, using simple conversion for $filename" "Submarine"
 
-            # Enable debug logging
+            # Enable debug logging and progress display
             export WORD_FORMATTER_DEBUG=1
+            export SHOW_PROGRESS=1
 
             # Still use AI converter - it has fallback logic for when Claude is not available
             # This ensures RTF/TXT files get proper markdown structure detection
             # Python will resolve template path via config_loader.py
             if [ -n "$CONFIG_FILE" ]; then
-                python "$SCRIPT_DIR/document_converter_ai.py" --config "$CONFIG_FILE" "$file"
+                "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/document_converter_ai.py" --config "$CONFIG_FILE" "$file"
             else
-                python "$SCRIPT_DIR/document_converter_ai.py" "$file"
+                "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/document_converter_ai.py" "$file"
             fi
             converter_exit_code=$?
             echo "AI converter (fallback mode) exit code: $converter_exit_code"
@@ -210,9 +212,9 @@ for file in "$@"; do
         # Use document_converter.py with config support
         # Python will resolve template path via config_loader.py
         if [ -n "$CONFIG_FILE" ]; then
-            python "$SCRIPT_DIR/document_converter.py" --input "$file" --config "$CONFIG_FILE"
+            "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/document_converter.py" --input "$file" --config "$CONFIG_FILE"
         else
-            python "$SCRIPT_DIR/document_converter.py" --input "$file"
+            "$SCRIPT_DIR/venv/bin/python" "$SCRIPT_DIR/document_converter.py" --input "$file"
         fi
         converter_exit_code=$?
         echo "Simple converter exit code: $converter_exit_code"
