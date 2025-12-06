@@ -56,6 +56,38 @@ try:
 except ImportError:
     RTF_SUPPORT = False
 
+import re
+
+# Unicode ranges for script detection
+DEVANAGARI_PATTERN = re.compile(r'[\u0900-\u097F]')  # Devanagari script (Sanskrit, Hindi, etc.)
+DIACRITICAL_PATTERN = re.compile(r'[āīūṛṝḷḹēōṃḥśṣṇḍṭñâîûêôäïüëö]', re.IGNORECASE)  # Transliteration diacritics
+
+
+def detect_script_type(text: str) -> str:
+    """
+    Detect the script type of text.
+
+    Returns:
+        'devanagari' - Text contains Devanagari script (Sanskrit, Hindi, etc.)
+        'transliteration' - Text contains Latin characters with diacritical marks
+        'plain' - Regular Latin text without special characters
+    """
+    if DEVANAGARI_PATTERN.search(text):
+        return 'devanagari'
+    elif DIACRITICAL_PATTERN.search(text):
+        return 'transliteration'
+    return 'plain'
+
+
+def contains_devanagari(text: str) -> bool:
+    """Check if text contains Devanagari script characters."""
+    return bool(DEVANAGARI_PATTERN.search(text))
+
+
+def contains_transliteration(text: str) -> bool:
+    """Check if text contains transliteration diacritical marks."""
+    return bool(DIACRITICAL_PATTERN.search(text)) and not contains_devanagari(text)
+
 
 class StyleExtractor:
     """Extracts formatting styles from a reference Word document."""
@@ -1512,32 +1544,47 @@ class DocumentConverter:
                                 for child in p_elem.children:
                                     if hasattr(child, 'name'):
                                         if child.name in ['em', 'i']:
-                                            run = para.add_run(child.get_text())
+                                            child_text = child.get_text()
+                                            run = para.add_run(child_text)
                                             run.italic = True
+                                            # Apply script-based styling
+                                            self._apply_script_style(run, child_text)
                                             # Apply reference style for italic text in quotes
                                             if is_opening_quote:
                                                 run.font.size = Pt(10)  # Smaller size for verses
                                         else:
-                                            para.add_run(child.get_text())
+                                            child_text = child.get_text()
+                                            run = para.add_run(child_text)
+                                            # Apply script-based styling for plain text
+                                            self._apply_script_style(run, child_text)
                                     else:
                                         # Plain text
                                         text_content = str(child).strip()
                                         if text_content:
-                                            para.add_run(text_content)
+                                            run = para.add_run(text_content)
+                                            # Apply script-based styling for plain text
+                                            self._apply_script_style(run, text_content)
                             else:
                                 # Plain text paragraph - for opening quotes, apply italic to entire text
                                 if is_opening_quote and i == 0:
                                     # First paragraph of opening quote (usually the verse/quote itself)
                                     run = para.add_run(text)
                                     run.italic = True
+                                    # Apply script-based styling
+                                    self._apply_script_style(run, text)
                                 else:
-                                    para.add_run(text)
-                
-                # Apply opening quote formatting if needed
+                                    run = para.add_run(text)
+                                    # Apply script-based styling for plain text
+                                    self._apply_script_style(run, text)
+
+                # Apply opening quote formatting if needed (only if no script-based style was applied)
                 if is_opening_quote:
-                    # Apply Emphasis character style to all runs in the paragraph
+                    # Apply Emphasis character style only to runs that don't already have a script-based style
                     for run in para.runs:
-                        run.style = 'Emphasis'
+                        run_text = run.text if run.text else ''
+                        script_type = detect_script_type(run_text)
+                        if script_type == 'plain':
+                            run.style = 'Emphasis'
                     if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                         print(f"DEBUG: Applied Emphasis character style to chapter opening quote blockquote")
 
@@ -1740,15 +1787,23 @@ class DocumentConverter:
             para.style = 'Quote'  # Use Quote style for code blocks
     
     def _process_inline_elements(self, element, paragraph):
-        """Process inline formatting like bold, italic, links."""
+        """Process inline formatting like bold, italic, links.
+
+        Applies script-based styling:
+        - Devanagari text: 'Intense Quote' style
+        - Transliteration (Latin with diacritics): 'Quote' style
+        """
         for child in element.children:
             if hasattr(child, 'name'):
                 if child.name == 'strong' or child.name == 'b':
                     run = paragraph.add_run(child.get_text())
                     run.bold = True
                 elif child.name == 'em' or child.name == 'i':
-                    run = paragraph.add_run(child.get_text())
+                    text = child.get_text()
+                    run = paragraph.add_run(text)
                     run.italic = True
+                    # Apply script-based styling for italic text
+                    self._apply_script_style(run, text)
                 elif child.name == 'code':
                     run = paragraph.add_run(child.get_text())
                     run.font.name = 'Courier New'
@@ -1757,10 +1812,71 @@ class DocumentConverter:
                     run.font.color.rgb = RGBColor(0, 0, 255)
                     run.underline = True
                 else:
-                    paragraph.add_run(child.get_text())
+                    text = child.get_text()
+                    run = paragraph.add_run(text)
+                    # Check plain text for script-based styling
+                    self._apply_script_style(run, text)
             else:
                 # Plain text
-                paragraph.add_run(str(child))
+                text = str(child)
+                run = paragraph.add_run(text)
+                # Check plain text for script-based styling
+                self._apply_script_style(run, text)
+
+    def _apply_script_style(self, run, text: str):
+        """Apply Word character style based on script type.
+
+        Uses configuration settings for style names:
+        - Devanagari script: config 'devanagari_style' (default: 'Intense Quote Char')
+        - Transliteration (diacritics): config 'transliteration_style' (default: 'Quote Char')
+
+        Note: Word has separate paragraph styles (Quote, Intense Quote) and character styles
+        (Quote Char, Intense Quote Char). For runs, we must use character styles.
+        """
+        if not text or not text.strip():
+            return
+
+        # Get script styling settings from config
+        script_settings = {}
+        if self.config:
+            script_settings = self.config.get_script_styling_settings()
+
+        # Check if script styling is enabled
+        if not script_settings.get('enabled', True):
+            return
+
+        # Get configured style names - convert paragraph style names to character style names if needed
+        devanagari_style = script_settings.get('devanagari_style', 'Intense Quote Char')
+        transliteration_style = script_settings.get('transliteration_style', 'Quote Char')
+
+        # Ensure we're using character style variants (append ' Char' if needed)
+        if devanagari_style == 'Intense Quote':
+            devanagari_style = 'Intense Quote Char'
+        if transliteration_style == 'Quote':
+            transliteration_style = 'Quote Char'
+
+        script_type = detect_script_type(text)
+
+        if script_type == 'devanagari':
+            try:
+                run.style = devanagari_style
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: Applied '{devanagari_style}' style to Devanagari text: '{text[:30]}...'")
+            except (KeyError, ValueError) as e:
+                # Style doesn't exist in document or wrong type, just use italic
+                run.italic = True
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: '{devanagari_style}' style error ({e}), using italic for Devanagari text")
+        elif script_type == 'transliteration':
+            try:
+                run.style = transliteration_style
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: Applied '{transliteration_style}' style to transliteration text: '{text[:30]}...'")
+            except (KeyError, ValueError) as e:
+                # Style doesn't exist in document or wrong type, just use italic
+                run.italic = True
+                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                    print(f"DEBUG: '{transliteration_style}' style error ({e}), using italic for transliteration text")
     
     def _process_table(self, table_element):
         """Process HTML table to Word table."""
