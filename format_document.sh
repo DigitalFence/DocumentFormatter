@@ -82,8 +82,9 @@ send_notification() {
             osascript -e "display alert \"$title\" message \"$subtitle: $message\" buttons {\"OK\"} default button \"OK\" giving up after 3"
             ;;
         "notification")
-            # Try terminal-notifier first (more reliable), fallback to osascript
-            if command -v terminal-notifier &> /dev/null; then
+            # Use terminal-notifier when in a terminal (interactive), osascript otherwise (Finder/Automator)
+            # terminal-notifier hangs when run from Finder context without a TTY
+            if [ -t 1 ] && command -v terminal-notifier &> /dev/null; then
                 terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message" -sound "$sound" -sender com.apple.finder 2>/dev/null
             else
                 osascript -e "display notification \"$message\" with title \"$title\" subtitle \"$subtitle\" sound name \"$sound\"" 2>/dev/null
@@ -204,11 +205,11 @@ for file in "$@"; do
         fi
     else
         echo "Non-text file, using simple converter..."
-        
+
         # Send notification for non-text file processing
         filename=$(basename "$file")
         send_notification "Word Formatter" "Standard Conversion" "Processing $filename (non-text file)" "Glass"
-        
+
         # Use document_converter.py with config support
         # Python will resolve template path via config_loader.py
         if [ -n "$CONFIG_FILE" ]; then
