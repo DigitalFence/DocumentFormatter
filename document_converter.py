@@ -724,7 +724,7 @@ class DocumentConverter:
         self.in_hierarchical_list = False
         self.current_list_heading_level = None
 
-        # Track special sections for page breaks
+        # Track special sections for page breaks (DISABLED for simplified logic)
         self.special_sections = {
             'title': False,
             'dedication': False,
@@ -736,6 +736,11 @@ class DocumentConverter:
         # Track if we're currently in TOC section (to keep heading and content together)
         self.in_toc_section = False
         self.toc_content_started = False
+
+        # Track first H2 for simplified page break logic
+        # First page: H1, H2, H3 all together
+        # Subsequent pages: only H2 triggers page break (with separator before)
+        self.first_h2_seen = False
 
     def _log_template_details(self, resolved_path: str):
         """Log detailed information about the template file being used."""
@@ -1192,96 +1197,110 @@ class DocumentConverter:
             # Determine the Word heading level
             word_heading_level = level
             
-            # Use configuration if available for behavioral rules
+            # SIMPLIFIED PAGE BREAK LOGIC:
+            # - Intro sections (Dedication, Foreword, etc.) always styled as H1 with page breaks
+            # - Chapters marked with H1 (# Chapter X) trigger separator + page break
+            # - H2 sections within chapters do NOT trigger page breaks
+
+            # List of intro section keywords that should always be H1 with page breaks
+            intro_keywords = ['dedication', 'foreword', 'preface', 'acknowledgment',
+                            'acknowledgement', 'note to the reader', 'introduction',
+                            'prologue', 'epilogue', 'afterword', 'appendix', 'glossary',
+                            'treasury', 'bibliography', 'index', 'references']
+
+            # Check if this is an intro section (regardless of markdown level)
+            is_intro_section = any(keyword in heading_text.lower() for keyword in intro_keywords)
+
             if self.config and self.always_use_behavioral_config:
-                # Check if this is a section (use Heading 1)
-                if self.config.is_section_keyword(heading_text):
+                # Force intro sections to H1 with page breaks, regardless of markdown level
+                if is_intro_section:
                     word_heading_level = 1
-                    # Check for page break setting
-                    if self.config.should_apply_page_break("section") and len(self.output_doc.paragraphs) > 0:
-                        self.output_doc.add_page_break()
-                # Check if this is a chapter (always use Heading 1)
-                elif level == 1 or self.config.is_chapter_keyword(heading_text):
-                    word_heading_level = 1
-                    
-                    # Debug logging
-                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                        print(f"DEBUG: Chapter detected: '{heading_text}' (level={level}, keyword_match={self.config.is_chapter_keyword(heading_text)})")
-                    
-                    # Add separator at end of previous chapter if we were in one
-                    if self.current_chapter_started:
-                        # Skip separator after intro sections (TOC, Preface) - they're not content chapters
-                        if ('table of contents' not in self.current_chapter_name.lower() and 
-                            'contents' != self.current_chapter_name.lower() and 
-                            'toc' != self.current_chapter_name.lower() and
-                            'preface' != self.current_chapter_name.lower()):
-                            separator_settings = self.config.get_chapter_separator()
-                            if separator_settings and separator_settings.get('enabled') and separator_settings.get('position') == 'after':
-                                self._add_chapter_separator(separator_settings)
-                                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                                    print(f"DEBUG: Added chapter separator at end of '{self.current_chapter_name}' before starting '{heading_text}'")
-                                else:
-                                    print(f"Added separator at end of chapter: {self.current_chapter_name}")
-                        elif os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                            print(f"DEBUG: Skipped separator after intro section: '{self.current_chapter_name}'")
-                    
-                    # Simple rule: Always add page break before chapters (H1 headings)
+
+                    # Add page break before intro sections (but no separator)
                     if len(self.output_doc.paragraphs) > 0:
                         self.output_doc.add_page_break()
                         if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: Added page break before intro section: '{heading_text}'")
+
+                # H1 headings (chapters - trigger page breaks after first content chapter)
+                # IMPORTANT: Only process H1 headings here, not H2/H3 that mention "chapter"
+                elif level == 1:
+                    word_heading_level = 1
+
+                    # If this H1 has "chapter" keyword, add separator + page break
+                    # (ALL chapters get page breaks, including Chapter 1)
+                    if 'chapter' in heading_text.lower() and len(self.output_doc.paragraphs) > 0:
+                        # Add separator symbol before page break
+                        separator_settings = self.config.get_chapter_separator()
+                        if separator_settings and separator_settings.get('enabled'):
+                            self._add_chapter_separator(separator_settings)
+                            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                                print(f"DEBUG: Added separator before chapter: '{heading_text}'")
+
+                        # Add page break
+                        self.output_doc.add_page_break()
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                             print(f"DEBUG: Added page break before chapter: '{heading_text}'")
-                        
-                        # Clear any special section flags since we're starting a new major section
-                        if self.special_sections.get('dedication'):
-                            self.special_sections['dedication'] = False
-                        if self.special_sections.get('contents'):
-                            self.special_sections['contents'] = False
-                    
-                    # Don't add separator before chapters - only after
-                    # (The separator is added when starting the next chapter or at end of document)
-                    
-                    # Mark that we're in a chapter for end-of-chapter separator
-                    self.current_chapter_started = True
-                    self.current_chapter_name = heading_text
-                    self.paragraphs_since_chapter = 0
-                    self.current_chapter_elements = []
-                # For other headings, use markdown level directly (chapters now use Heading 1)
-                elif level >= 2:
+
+                        # Mark that we've started chapters
+                        self.current_chapter_started = True
+                    else:
+                        # This is an intro H1 (title, dedication, etc.) - no page break
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: H1 intro section (no page break): '{heading_text}'")
+
+                # H2 headings (sections within chapters - NO page breaks)
+                elif level == 2:
+                    word_heading_level = 2
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: H2 section detected (no page break): '{heading_text}'")
+
+                # H3 and below (no page breaks)
+                elif level >= 3:
                     word_heading_level = min(level, 6)  # Cap at level 6
             else:
-                # Fallback to hardcoded logic if no config
+                # Fallback to hardcoded logic if no config (SIMPLIFIED)
                 # Check if this is a title first
                 if 'title' in heading_text.lower():
                     use_title_style = True
                     word_heading_level = 0
-                elif 'section' in heading_text.lower() or 'part' in heading_text.lower():
-                    word_heading_level = 1
-                elif level == 1 or 'chapter' in heading_text.lower():
+                # Force intro sections to H1 with page breaks
+                elif is_intro_section:
                     word_heading_level = 1
                     if len(self.output_doc.paragraphs) > 0:
                         self.output_doc.add_page_break()
-                elif level >= 2:
+                # H1: chapters get separator + page break (ALL chapters, including Chapter 1)
+                elif level == 1:
+                    word_heading_level = 1
+                    # If this H1 has "chapter" keyword, add separator + page break
+                    if 'chapter' in heading_text.lower() and len(self.output_doc.paragraphs) > 0:
+                        if self.config:
+                            separator_settings = self.config.get_chapter_separator()
+                            if separator_settings and separator_settings.get('enabled'):
+                                self._add_chapter_separator(separator_settings)
+                        self.output_doc.add_page_break()
+                        self.current_chapter_started = True
+                # H2: sections within chapters - NO page breaks
+                elif level == 2:
+                    word_heading_level = 2
+                # H3+: no page breaks
+                elif level >= 3:
                     word_heading_level = min(level, 6)
-            
-            # Check if this is a special section
-            special_section = self._is_special_section(heading_text)
-            
+
+            # DISABLED: Special section handling
+            # special_section = self._is_special_section(heading_text)
+            special_section = None
+
             # If this is the title (first H1), mark it as title special section
             if use_title_style:
                 special_section = 'title'
-            
-            # Special section page breaks are handled in paragraph processing, not for headings
-            # Headings get their page breaks from heading/chapter logic
-            
-            # Check if exiting TOC section (new major heading encountered)
-            if self.in_toc_section and self.toc_content_started:
-                # End of TOC section detected, add deferred page break
-                if self.config and self.config.should_add_page_break_after_contents():
-                    self.output_doc.add_page_break()
-                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                        print(f"DEBUG: Added deferred page break after TOC content")
-                self.in_toc_section = False
-                self.toc_content_started = False
+
+            # DISABLED: TOC section handling
+            # if self.in_toc_section and self.toc_content_started:
+            #     if self.config and self.config.should_add_page_break_after_contents():
+            #         self.output_doc.add_page_break()
+            #     self.in_toc_section = False
+            #     self.toc_content_started = False
 
             # Add the heading or title
             if use_title_style or special_section == 'title':
@@ -1317,14 +1336,14 @@ class DocumentConverter:
                         if 'line_spacing' in title_override and title_override['line_spacing'] is not None:
                             heading.paragraph_format.line_spacing = title_override['line_spacing']
 
-                # Mark as special section if detected
-                if special_section:
-                    self._handle_special_section_page_break(special_section)
+                # DISABLED: Mark as special section if detected
+                # if special_section:
+                #     self._handle_special_section_page_break(special_section)
             else:
                 heading = self.output_doc.add_heading(heading_text, level=word_heading_level)
-                # Check for other special sections
-                if special_section:
-                    self._handle_special_section_page_break(special_section)
+                # DISABLED: Check for other special sections
+                # if special_section:
+                #     self._handle_special_section_page_break(special_section)
             
             # Apply heading overrides from configuration if available
             if self.config and hasattr(self.config, 'get_heading_override'):
@@ -1372,25 +1391,26 @@ class DocumentConverter:
                     # No override - template styles are used
                     pass
             
-            # Add page breaks after Title, Dedication, or Contents
-            if self.config:
-                # Check for Title page break
-                if (hasattr(self.config, 'is_title_keyword') and self.config.is_title_keyword(heading_text) and 
-                    self.config.should_add_page_break_after_title()):
-                    # Add a page break after this paragraph
-                    self.output_doc.add_page_break()
-                
-                # Check for Dedication page break
-                elif (hasattr(self.config, 'is_dedication_keyword') and self.config.is_dedication_keyword(heading_text) and 
-                      self.config.should_add_page_break_after_dedication()):
-                    self.output_doc.add_page_break()
-                
-                # Check for Contents - mark section but defer page break until after content
-                elif (hasattr(self.config, 'is_contents_keyword') and self.config.is_contents_keyword(heading_text)):
-                    self.in_toc_section = True
-                    self.toc_content_started = False
-                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                        print(f"DEBUG: Entered TOC section, deferring page break until after content")
+            # DISABLED: Add page breaks after Title, Dedication, or Contents
+            # This is disabled in favor of simplified page break logic (only H2 triggers breaks)
+            # if self.config:
+            #     # Check for Title page break
+            #     if (hasattr(self.config, 'is_title_keyword') and self.config.is_title_keyword(heading_text) and
+            #         self.config.should_add_page_break_after_title()):
+            #         # Add a page break after this paragraph
+            #         self.output_doc.add_page_break()
+            #
+            #     # Check for Dedication page break
+            #     elif (hasattr(self.config, 'is_dedication_keyword') and self.config.is_dedication_keyword(heading_text) and
+            #           self.config.should_add_page_break_after_dedication()):
+            #         self.output_doc.add_page_break()
+            #
+            #     # Check for Contents - mark section but defer page break until after content
+            #     elif (hasattr(self.config, 'is_contents_keyword') and self.config.is_contents_keyword(heading_text)):
+            #         self.in_toc_section = True
+            #         self.toc_content_started = False
+            #         if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+            #             print(f"DEBUG: Entered TOC section, deferring page break until after content")
             
             # Check if this heading introduces a hierarchical list section
             if self.config:
@@ -1619,19 +1639,20 @@ class DocumentConverter:
                 # Remove the placeholder from the text
                 text = text.replace('<!--PAGEBREAK-->', '')
             
-            # Check if this paragraph is a special section (like "Dedicated to")
-            special_section = self._is_special_section(text)
-            if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                print(f"DEBUG: Checking paragraph for special section: '{text[:30]}...' -> {special_section}")
-            if special_section and special_section == 'dedication':
-                # Handle dedication as a special paragraph
-                para = self.output_doc.add_paragraph()
-                self._process_inline_elements(element, para)
-                # Add page break after dedication paragraph
-                self._handle_special_section_page_break(special_section)
-                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                    print(f"DEBUG: Processed dedication paragraph (page break deferred until next major section)")
-                return
+            # DISABLED: Check if this paragraph is a special section (like "Dedicated to")
+            # This is disabled in favor of simplified page break logic
+            # special_section = self._is_special_section(text)
+            # if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+            #     print(f"DEBUG: Checking paragraph for special section: '{text[:30]}...' -> {special_section}")
+            # if special_section and special_section == 'dedication':
+            #     # Handle dedication as a special paragraph
+            #     para = self.output_doc.add_paragraph()
+            #     self._process_inline_elements(element, para)
+            #     # Add page break after dedication paragraph
+            #     self._handle_special_section_page_break(special_section)
+            #     if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+            #         print(f"DEBUG: Processed dedication paragraph (page break deferred until next major section)")
+            #     return
             
             # Check if this is a chapter opening quote
             is_opening_quote = False
@@ -1811,6 +1832,13 @@ class DocumentConverter:
                     run = paragraph.add_run(child.get_text())
                     run.font.color.rgb = RGBColor(0, 0, 255)
                     run.underline = True
+                elif child.name == 'span':
+                    color = self._parse_color_from_style(child.get('style', ''))
+                    run_start = len(paragraph.runs)
+                    self._process_inline_elements(child, paragraph)
+                    if color:
+                        for run in paragraph.runs[run_start:]:
+                            run.font.color.rgb = color
                 else:
                     text = child.get_text()
                     run = paragraph.add_run(text)
@@ -1822,6 +1850,16 @@ class DocumentConverter:
                 run = paragraph.add_run(text)
                 # Check plain text for script-based styling
                 self._apply_script_style(run, text)
+
+    def _parse_color_from_style(self, style: str):
+        """Parse a CSS color value from an inline style string and return RGBColor, or None."""
+        match = re.search(r'color\s*:\s*#([0-9A-Fa-f]{3,6})', style)
+        if not match:
+            return None
+        hex_val = match.group(1)
+        if len(hex_val) == 3:
+            hex_val = ''.join(c * 2 for c in hex_val)
+        return RGBColor.from_string(hex_val.upper())
 
     def _apply_script_style(self, run, text: str):
         """Apply Word character style based on script type.

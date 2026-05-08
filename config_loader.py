@@ -266,7 +266,7 @@ class FormatterConfig:
         # Check external reference folder first
         external_folder = self.config.get("external_reference_folder")
         if external_folder:
-            external_path = Path(external_folder) / filename
+            external_path = Path(external_folder).expanduser() / filename
             if external_path.exists():
                 return external_path
 
