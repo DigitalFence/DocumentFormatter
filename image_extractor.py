@@ -110,6 +110,56 @@ def extract_first_image(doc_path: str):
     return None
 
 
+def recolor_image(image_data: bytes, hex_color: str) -> bytes:
+    """Recolor line art/logo artwork to a solid flat color.
+
+    Pixels near white (the background) become transparent; anything else
+    becomes fully opaque and is replaced with the target color, with a
+    short ramp between the two so edges stay anti-aliased. Using a
+    threshold rather than a straight luminosity-to-alpha mapping avoids
+    washing out art whose original ink color was already light (e.g. a
+    pale gradient logo) into a faded result - the goal is a bold, solid
+    color matching flat UI text, not a translucent tint.
+
+    Args:
+        image_data: Source image bytes (any Pillow-readable format)
+        hex_color: Target color as a hex string, e.g. "943634" or "#943634"
+
+    Returns:
+        PNG-encoded image bytes
+    """
+    from PIL import Image
+
+    hex_color = hex_color.lstrip('#')
+    target = tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+
+    # Below this luminosity: fully opaque. Above this: fully transparent.
+    # In between: linear ramp, for anti-aliased edges.
+    OPAQUE_BELOW = 225
+    TRANSPARENT_AT = 250
+
+    image = Image.open(io.BytesIO(image_data)).convert('RGBA')
+    pixels = image.load()
+    width, height = image.size
+    for y in range(height):
+        for x in range(width):
+            r, g, b, a = pixels[x, y]
+            luminosity = (r + g + b) / 3
+            if luminosity <= OPAQUE_BELOW:
+                coverage = 255
+            elif luminosity >= TRANSPARENT_AT:
+                coverage = 0
+            else:
+                span = TRANSPARENT_AT - OPAQUE_BELOW
+                coverage = int(255 * (TRANSPARENT_AT - luminosity) / span)
+            alpha = coverage * a // 255
+            pixels[x, y] = (target[0], target[1], target[2], alpha)
+
+    output = io.BytesIO()
+    image.save(output, format='PNG')
+    return output.getvalue()
+
+
 def save_extracted_image(doc_path: str, output_path: str = None):
     """Extract and save the first image from a Word document.
     

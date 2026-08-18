@@ -40,6 +40,7 @@ class FormatterConfig:
             "enabled": False,
             "symbol": "❦",
             "symbol_source": None,
+            "color": None,
             "position": "before",
             "spacing_before": 12,
             "spacing_after": 12,
@@ -330,6 +331,9 @@ class FormatterConfig:
                     result = extract_first_image(str(symbol_path))
                     if result:
                         image_data, width, height = result
+                        if settings.get("color"):
+                            from image_extractor import recolor_image
+                            image_data = recolor_image(image_data, settings["color"])
                         settings["image_data"] = image_data
                         settings["image_width"] = width or 0.5  # Default width if not found
                         settings["image_height"] = height or 0.5  # Default height
