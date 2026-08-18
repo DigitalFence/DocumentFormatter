@@ -62,6 +62,9 @@ import re
 DEVANAGARI_PATTERN = re.compile(r'[\u0900-\u097F]')  # Devanagari script (Sanskrit, Hindi, etc.)
 DIACRITICAL_PATTERN = re.compile(r'[āīūṛṝḷḹēōṃḥśṣṇḍṭñâîûêôäïüëö]', re.IGNORECASE)  # Transliteration diacritics
 
+# Splits "Chapter 1: The Beginning" into ("Chapter 1", "The Beginning")
+CHAPTER_NUMBER_PATTERN = re.compile(r'^(chapter\s+\d+[a-z]?)\s*[:.\-–—]?\s*(.*)$', re.IGNORECASE)
+
 
 def detect_script_type(text: str) -> str:
     """
@@ -713,6 +716,11 @@ class DocumentConverter:
         self.current_chapter_name = ""
         self.paragraphs_since_chapter = 0
         self.current_chapter_elements = []
+
+        # When a bare "# Chapter N" (no title text) is emitted as a "Chapter Number"
+        # paragraph, the very next H2 is the chapter's actual name and should render
+        # as Heading 1 instead of Heading 2.
+        self.pending_chapter_title_as_h1 = False
         
         # Track whether we've processed the first H1 as title
         self.first_h1_as_title = False
@@ -1177,7 +1185,11 @@ class DocumentConverter:
             return
         if element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
             level = int(element.name[1])
-            
+
+            # Clear a stale pending chapter-title flag if the expected H2 never showed up
+            if self.pending_chapter_title_as_h1 and level != 2:
+                self.pending_chapter_title_as_h1 = False
+
             # Handle first H1 as Title only for books (with TOC and multiple chapters)
             if element.name == 'h1' and not self.first_h1_as_title and self.is_book_with_title:
                 use_title_style = True
@@ -1211,6 +1223,10 @@ class DocumentConverter:
             # Check if this is an intro section (regardless of markdown level)
             is_intro_section = any(keyword in heading_text.lower() for keyword in intro_keywords)
 
+            # Chapters get their number/title split into two paragraphs (see below);
+            # set once we know this H1 is a chapter, not an intro section or title.
+            is_chapter_heading = False
+
             if self.config and self.always_use_behavioral_config:
                 # Force intro sections to H1 with page breaks, regardless of markdown level
                 if is_intro_section:
@@ -1226,10 +1242,11 @@ class DocumentConverter:
                 # IMPORTANT: Only process H1 headings here, not H2/H3 that mention "chapter"
                 elif level == 1:
                     word_heading_level = 1
+                    is_chapter_heading = 'chapter' in heading_text.lower()
 
                     # If this H1 has "chapter" keyword, add separator + page break
                     # (ALL chapters get page breaks, including Chapter 1)
-                    if 'chapter' in heading_text.lower() and len(self.output_doc.paragraphs) > 0:
+                    if is_chapter_heading and len(self.output_doc.paragraphs) > 0:
                         # Add separator symbol before page break
                         separator_settings = self.config.get_chapter_separator()
                         if separator_settings and separator_settings.get('enabled'):
@@ -1251,9 +1268,16 @@ class DocumentConverter:
 
                 # H2 headings (sections within chapters - NO page breaks)
                 elif level == 2:
-                    word_heading_level = 2
-                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                        print(f"DEBUG: H2 section detected (no page break): '{heading_text}'")
+                    if self.pending_chapter_title_as_h1:
+                        # This H2 is the chapter name following a bare "Chapter N" H1
+                        word_heading_level = 1
+                        self.pending_chapter_title_as_h1 = False
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: H2 promoted to Heading 1 as chapter name: '{heading_text}'")
+                    else:
+                        word_heading_level = 2
+                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                            print(f"DEBUG: H2 section detected (no page break): '{heading_text}'")
 
                 # H3 and below (no page breaks)
                 elif level >= 3:
@@ -1272,8 +1296,9 @@ class DocumentConverter:
                 # H1: chapters get separator + page break (ALL chapters, including Chapter 1)
                 elif level == 1:
                     word_heading_level = 1
+                    is_chapter_heading = 'chapter' in heading_text.lower()
                     # If this H1 has "chapter" keyword, add separator + page break
-                    if 'chapter' in heading_text.lower() and len(self.output_doc.paragraphs) > 0:
+                    if is_chapter_heading and len(self.output_doc.paragraphs) > 0:
                         if self.config:
                             separator_settings = self.config.get_chapter_separator()
                             if separator_settings and separator_settings.get('enabled'):
@@ -1282,7 +1307,11 @@ class DocumentConverter:
                         self.current_chapter_started = True
                 # H2: sections within chapters - NO page breaks
                 elif level == 2:
-                    word_heading_level = 2
+                    if self.pending_chapter_title_as_h1:
+                        word_heading_level = 1
+                        self.pending_chapter_title_as_h1 = False
+                    else:
+                        word_heading_level = 2
                 # H3+: no page breaks
                 elif level >= 3:
                     word_heading_level = min(level, 6)
@@ -1339,6 +1368,26 @@ class DocumentConverter:
                 # DISABLED: Mark as special section if detected
                 # if special_section:
                 #     self._handle_special_section_page_break(special_section)
+            elif is_chapter_heading and 'Chapter Number' in self.output_doc.styles:
+                # Chapters get the number on its own line ("Chapter Number" style),
+                # followed by just the chapter name in the usual Heading 1 style.
+                match = CHAPTER_NUMBER_PATTERN.match(heading_text)
+                number_label = match.group(1).strip() if match else None
+                chapter_title = match.group(2).strip() if match else ''
+
+                if number_label:
+                    number_para = self.output_doc.add_paragraph(number_label)
+                    number_para.style = 'Chapter Number'
+                    if chapter_title:
+                        heading = self.output_doc.add_heading(chapter_title, level=word_heading_level)
+                    else:
+                        # Bare "Chapter N" with no title on the same line - the next
+                        # H2 (if any) is the chapter name and should render as Heading 1
+                        heading = number_para
+                        self.pending_chapter_title_as_h1 = True
+                else:
+                    # Text didn't match the "Chapter N" pattern - fall back to a single heading
+                    heading = self.output_doc.add_heading(heading_text, level=word_heading_level)
             else:
                 heading = self.output_doc.add_heading(heading_text, level=word_heading_level)
                 # DISABLED: Check for other special sections
