@@ -1246,20 +1246,23 @@ class DocumentConverter:
 
                     # If this H1 has "chapter" keyword, add separator + page break
                     # (ALL chapters get page breaks, including Chapter 1)
-                    if is_chapter_heading and len(self.output_doc.paragraphs) > 0:
-                        # Add separator symbol before page break
-                        separator_settings = self.config.get_chapter_separator()
-                        if separator_settings and separator_settings.get('enabled'):
-                            self._add_chapter_separator(separator_settings)
+                    if is_chapter_heading:
+                        if len(self.output_doc.paragraphs) > 0:
+                            # Add separator symbol before page break
+                            separator_settings = self.config.get_chapter_separator()
+                            if separator_settings and separator_settings.get('enabled'):
+                                self._add_chapter_separator(separator_settings)
+                                if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                                    print(f"DEBUG: Added separator before chapter: '{heading_text}'")
+
+                            # Add page break
+                            self.output_doc.add_page_break()
                             if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                                print(f"DEBUG: Added separator before chapter: '{heading_text}'")
+                                print(f"DEBUG: Added page break before chapter: '{heading_text}'")
 
-                        # Add page break
-                        self.output_doc.add_page_break()
-                        if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
-                            print(f"DEBUG: Added page break before chapter: '{heading_text}'")
-
-                        # Mark that we've started chapters
+                        # Mark that we've started chapters (even if this is the very
+                        # first paragraph in the document) so the closing separator
+                        # still gets added at the end for single-chapter documents.
                         self.current_chapter_started = True
                     else:
                         # This is an intro H1 (title, dedication, etc.) - no page break
@@ -1279,8 +1282,14 @@ class DocumentConverter:
                         if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
                             print(f"DEBUG: H2 section detected (no page break): '{heading_text}'")
 
-                # H3 and below (no page breaks)
-                elif level >= 3:
+                # H3 promoted to Heading 2 (no page breaks)
+                elif level == 3:
+                    word_heading_level = 2
+                    if os.environ.get('WORD_FORMATTER_DEBUG', '0') == '1':
+                        print(f"DEBUG: H3 promoted to Heading 2: '{heading_text}'")
+
+                # H4 and below (no page breaks)
+                elif level >= 4:
                     word_heading_level = min(level, 6)  # Cap at level 6
             else:
                 # Fallback to hardcoded logic if no config (SIMPLIFIED)
@@ -1298,12 +1307,13 @@ class DocumentConverter:
                     word_heading_level = 1
                     is_chapter_heading = 'chapter' in heading_text.lower()
                     # If this H1 has "chapter" keyword, add separator + page break
-                    if is_chapter_heading and len(self.output_doc.paragraphs) > 0:
-                        if self.config:
-                            separator_settings = self.config.get_chapter_separator()
-                            if separator_settings and separator_settings.get('enabled'):
-                                self._add_chapter_separator(separator_settings)
-                        self.output_doc.add_page_break()
+                    if is_chapter_heading:
+                        if len(self.output_doc.paragraphs) > 0:
+                            if self.config:
+                                separator_settings = self.config.get_chapter_separator()
+                                if separator_settings and separator_settings.get('enabled'):
+                                    self._add_chapter_separator(separator_settings)
+                            self.output_doc.add_page_break()
                         self.current_chapter_started = True
                 # H2: sections within chapters - NO page breaks
                 elif level == 2:
@@ -1312,8 +1322,11 @@ class DocumentConverter:
                         self.pending_chapter_title_as_h1 = False
                     else:
                         word_heading_level = 2
-                # H3+: no page breaks
-                elif level >= 3:
+                # H3 promoted to Heading 2 (no page breaks)
+                elif level == 3:
+                    word_heading_level = 2
+                # H4+: no page breaks
+                elif level >= 4:
                     word_heading_level = min(level, 6)
 
             # DISABLED: Special section handling
